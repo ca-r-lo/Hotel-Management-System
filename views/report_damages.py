@@ -47,6 +47,11 @@ class ReportDamagesDialog(QDialog):
                 border: 2px solid #000000;
                 gridline-color: #000000;
                 background-color: #ffffff;
+                color: #000000;
+            }
+            QTableWidget::item {
+                color: #000000;
+                padding: 8px;
             }
             QHeaderView::section {
                 background-color: #ffffff;

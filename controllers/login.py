@@ -32,8 +32,9 @@ class LoginController:
             except Exception as e:
                 print(f"Error initializing database tables: {e}")
 
-            # Switch Windows
+            # Switch Windows and set current user
             self.view.hide()
+            self.dashboard_view.current_user = full_name  # Store logged-in user
             self.dashboard_view.show()
             try:
                 self.dashboard_view.name_lbl.setText(full_name)

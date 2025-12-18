@@ -3,13 +3,10 @@ from PyQt6.QtWidgets import QApplication
 from PyQt6.QtGui import QFont, QIcon, QPixmap
 from PyQt6.QtCore import Qt
 
-from controllers.purchase_controller import PurchaseController
 from views.login import LoginWindow
 from views.dashboard import DashboardWindow
 
 from controllers.login import LoginController
-from views.purchase_view import PurchasePage
-from models.purchase import PurchaseModel
 from models.user import UserModel
 
 from configs.config import DB_CONFIG
@@ -37,10 +34,6 @@ def main():
     user_model = UserModel(DB_CONFIG)
 
     controller = LoginController(login_view, user_model, dashboard_view)
-    
-    purchase_view = PurchasePage()
-    purchase_model = PurchaseModel()
-    purchase_controller = PurchaseController(purchase_view, purchase_model)
     
     login_view.show()
     

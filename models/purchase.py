@@ -7,10 +7,21 @@ def _paramstyle():
 
 def _exec(conn, sql, params=None):
     cur = conn.cursor()
-    if params:
-        cur.execute(sql, params)
-    else:
-        cur.execute(sql)
+    # Debugging: print SQL and params when running to aid troubleshooting
+    try:
+        if params:
+            # ensure params is a tuple/list for DB API
+            cur.execute(sql, params)
+        else:
+            cur.execute(sql)
+    except Exception:
+        try:
+            # best-effort debug output
+            print("[SQL DEBUG] Failed SQL:\n", sql)
+            print("[SQL DEBUG] Params:\n", params)
+        except Exception:
+            pass
+        raise
     return cur
 
 
@@ -268,32 +279,41 @@ class ItemModel:
 class PurchaseModel:
     @staticmethod
     def create_purchase(supplier_id: int, items: list, expected_date: str | None, created_by: str | None = None):
-        """items is a list of dicts: {item_name, qty, price}
+        """items is a list of dicts: {item_id, quantity, unit_price}
         Returns new purchase id on success or None.
         """
         conn = get_conn()
         try:
             cur = conn.cursor()
             param = _paramstyle()
-            # insert purchase
-            sql = f"INSERT INTO purchases (supplier_id, expected_date, total_amount, status, created_at) VALUES ({param}, {param}, {param}, {param}, {param})"
-            total = sum([(float(i.get('qty',0)) * float(i.get('price',0))) for i in items])
-            _exec(conn, sql, (supplier_id, expected_date or None, total, 'pending', datetime.now()))
-            # fetch last id
-            if DB_DRIVER == 'mariadb':
-                purchase_id = cur.lastrowid
-            else:
-                purchase_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+            # insert purchase with created_by
+            sql = f"INSERT INTO purchases (supplier_id, expected_date, total_amount, status, created_by, created_at) VALUES ({param}, {param}, {param}, {param}, {param}, {param})"
+            total = sum([(float(i.get('quantity',0)) * float(i.get('unit_price',0))) for i in items])
+            cur_ins = _exec(conn, sql, (supplier_id, expected_date or None, total, 'pending', created_by, datetime.now()))
+            # fetch last id from the cursor that executed the insert
+            try:
+                purchase_id = cur_ins.lastrowid
+            except Exception:
+                # fallback for sqlite or drivers without lastrowid on cursor
+                try:
+                    purchase_id = conn.execute('SELECT last_insert_rowid()').fetchone()[0]
+                except Exception:
+                    purchase_id = None
 
             # insert items
             for it in items:
-                _exec(conn, f"INSERT INTO purchase_items (purchase_id, item_name, qty, price, total) VALUES ({param},{param},{param},{param},{param})",
-                      (purchase_id, it.get('item_name'), it.get('qty'), it.get('price'), float(it.get('qty',0)) * float(it.get('price',0))))
+                _exec(conn, f"INSERT INTO purchase_items (purchase_id, item_id, quantity, unit_price, total) VALUES ({param},{param},{param},{param},{param})",
+                      (purchase_id, it.get('item_id'), it.get('quantity'), it.get('unit_price'), float(it.get('quantity',0)) * float(it.get('unit_price',0))))
             conn.commit()
             return purchase_id
         except Exception as e:
             try:
                 conn.rollback()
+            except Exception:
+                pass
+            # debug print
+            try:
+                print("[CREATE_PURCHASE ERROR]", repr(e))
             except Exception:
                 pass
             raise
@@ -305,17 +325,50 @@ class PurchaseModel:
         conn = get_conn()
         try:
             cur = conn.cursor()
+            # Join with suppliers and count items
+            sql = """
+                SELECT 
+                    p.id, 
+                    p.supplier_id, 
+                    p.expected_date, 
+                    p.total_amount, 
+                    p.status, 
+                    p.created_at,
+                    p.created_by,
+                    s.name as supplier_name,
+                    s.contact_name as supplier_contact,
+                    COUNT(pi.id) as item_count
+                FROM purchases p
+                LEFT JOIN suppliers s ON p.supplier_id = s.id
+                LEFT JOIN purchase_items pi ON p.id = pi.purchase_id
+            """
             if status:
-                cur.execute("SELECT id, supplier_id, expected_date, total_amount, status, created_at FROM purchases WHERE status = {} ORDER BY created_at DESC".format(_paramstyle()), (status,))
+                sql += " WHERE p.status = {} ".format(_paramstyle())
+                sql += " GROUP BY p.id, p.supplier_id, p.expected_date, p.total_amount, p.status, p.created_at, p.created_by, s.name, s.contact_name"
+                sql += " ORDER BY p.created_at DESC"
+                cur.execute(sql, (status,))
             else:
-                cur.execute("SELECT id, supplier_id, expected_date, total_amount, status, created_at FROM purchases ORDER BY created_at DESC")
+                sql += " GROUP BY p.id, p.supplier_id, p.expected_date, p.total_amount, p.status, p.created_at, p.created_by, s.name, s.contact_name"
+                sql += " ORDER BY p.created_at DESC"
+                cur.execute(sql)
             rows = cur.fetchall()
             result = []
             for r in rows:
                 try:
                     result.append(dict(r))
                 except Exception:
-                    result.append({'id': r[0], 'supplier_id': r[1], 'expected_date': r[2], 'total_amount': r[3], 'status': r[4], 'created_at': r[5]})
+                    result.append({
+                        'id': r[0], 
+                        'supplier_id': r[1], 
+                        'expected_date': r[2], 
+                        'total_amount': r[3], 
+                        'status': r[4], 
+                        'created_at': r[5],
+                        'created_by': r[6],
+                        'supplier_name': r[7],
+                        'supplier_contact': r[8],
+                        'item_count': r[9]
+                    })
             return result
         finally:
             conn.close()
