@@ -7,7 +7,8 @@ class LoginWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("STASH - Hotel Management System")
-        self.setMinimumSize(1000, 600)
+        # Make window maximized (windowed fullscreen)
+        self.showMaximized()
         self.init_ui()
 
     def init_ui(self):

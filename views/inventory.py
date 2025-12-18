@@ -173,6 +173,27 @@ class AddStockDialog(QDialog):
         """)
         form_layout.addWidget(self.unit_edit)
 
+        # Unit Cost
+        unit_cost_label = QLabel("UNIT COST (₱):")
+        unit_cost_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold;")
+        form_layout.addWidget(unit_cost_label)
+        
+        self.unit_cost_spin = QSpinBox()
+        self.unit_cost_spin.setRange(0, 999999)
+        self.unit_cost_spin.setFixedHeight(35)
+        self.unit_cost_spin.setPrefix("₱ ")
+        self.unit_cost_spin.setStyleSheet(f"""
+            QSpinBox {{
+                border: 2px solid {STYLE_BORDER};
+                border-radius: 4px;
+                padding: 5px 10px;
+                background-color: white;
+                color: {STYLE_NAVY};
+            }}
+            QSpinBox:focus {{ border-color: {STYLE_BLUE}; }}
+        """)
+        form_layout.addWidget(self.unit_cost_spin)
+
         # Stock Quantity
         stock_label = QLabel("STOCK QUANTITY:")
         stock_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold;")
@@ -261,6 +282,7 @@ class AddStockDialog(QDialog):
                 self.category_cb.setCurrentIndex(index)
             
             self.unit_edit.setText(self.item_data.get('unit', ''))
+            self.unit_cost_spin.setValue(int(self.item_data.get('unit_cost', 0)))
             self.stock_spin.setValue(int(self.item_data.get('stock_qty', 0)))
             self.min_spin.setValue(int(self.item_data.get('min_stock', 0)))
 
@@ -270,6 +292,7 @@ class AddStockDialog(QDialog):
             'name': self.name_edit.text(),
             'category': self.category_cb.currentText(),
             'unit': self.unit_edit.text(),
+            'unit_cost': self.unit_cost_spin.value(),
             'stock_qty': self.stock_spin.value(),
             'min_stock': self.min_spin.value()
         }

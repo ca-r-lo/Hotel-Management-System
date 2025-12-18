@@ -37,13 +37,15 @@ def main():
     
     # Set logout callback to show login window again
     def on_logout():
+        dashboard_view.close()
         login_view.email_input.clear()
         login_view.pass_input.clear()
-        login_view.show()
+        login_view.hide()
+        login_view.showMaximized()
     
     dashboard_view.on_logout = on_logout
     
-    login_view.show()
+    login_view.showMaximized()
     
     sys.exit(app.exec())
 

@@ -184,6 +184,7 @@ class InventoryController:
                 name=data['name'],
                 category=data['category'],
                 unit=data['unit'],
+                unit_cost=data['unit_cost'],
                 stock_qty=data['stock_qty'],
                 min_stock=data['min_stock']
             )
@@ -241,6 +242,7 @@ class InventoryController:
                 name=data['name'],
                 category=data['category'],
                 unit=data['unit'],
+                unit_cost=data['unit_cost'],
                 stock_qty=data['stock_qty'],
                 min_stock=data['min_stock']
             )

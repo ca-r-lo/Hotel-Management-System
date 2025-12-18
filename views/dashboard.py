@@ -6,10 +6,14 @@ from views.purchase_view import PurchasePage
 from views.inventory import InventoryPage
 from views.reports import ReportsPage
 from views.messages import MessagesPage
+from views.trans_history import TransactionHistoryPage
+from views.dept_overview import DepartmentOverviewPage
 from controllers.purchase_controller import PurchaseController
 from controllers.inventory_controller import InventoryController
 from controllers.reports_controller import ReportsController
 from controllers.messages_controller import MessagesController
+from controllers.trans_history_controller import TransactionHistoryController
+from controllers.dept_overview_controller import DeptOverviewController
 from models import purchase as purchase_model
 
 class DashboardWindow(QMainWindow):
@@ -23,7 +27,6 @@ class DashboardWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("STASH - Hotel Management System")
-        self.setMinimumSize(1200, 800)
         self.current_user = None  # Store logged-in user name
         self.current_role = None  # Store logged-in user role
         self.init_ui()
@@ -240,24 +243,10 @@ class DashboardWindow(QMainWindow):
         dash_page_layout.addStretch()
 
         # PAGE 2: TRANS HISTORY (Transaction History)
-        self.trans_history_page = QWidget()
-        trans_history_layout = QVBoxLayout(self.trans_history_page)
-        trans_history_layout.setContentsMargins(20, 20, 20, 20)
-        trans_history_label = QLabel("Transaction History - Coming Soon")
-        trans_history_label.setFont(QFont("Arial", 18))
-        trans_history_label.setStyleSheet("color: #6b7280;")
-        trans_history_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        trans_history_layout.addWidget(trans_history_label)
+        self.trans_history_page = TransactionHistoryPage()
         
         # PAGE 3: DEPT OVERVIEW (Department Overview)
-        self.dept_overview_page = QWidget()
-        dept_overview_layout = QVBoxLayout(self.dept_overview_page)
-        dept_overview_layout.setContentsMargins(20, 20, 20, 20)
-        dept_overview_label = QLabel("Department Overview - Coming Soon")
-        dept_overview_label.setFont(QFont("Arial", 18))
-        dept_overview_label.setStyleSheet("color: #6b7280;")
-        dept_overview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        dept_overview_layout.addWidget(dept_overview_label)
+        self.dept_overview_page = DepartmentOverviewPage()
         
         # PAGE 4: PURCHASE (Initialized and added AFTER self.main_stack exists)
         self.purchase_page = PurchasePage()
@@ -278,6 +267,8 @@ class DashboardWindow(QMainWindow):
         self.inventory_ctrl = InventoryController(self.inventory_page, self.p_model)
         self.reports_ctrl = ReportsController(self.reports_page, self.p_model)
         self.messages_ctrl = MessagesController(self.messages_page, self.m_model, self)
+        self.trans_history_ctrl = TransactionHistoryController(self.trans_history_page, self.p_model)
+        self.dept_overview_ctrl = DeptOverviewController(self.dept_overview_page)
 
         # 6. Assemble Stack
         self.main_stack.addWidget(self.dash_page)          # Index 0

@@ -307,13 +307,13 @@ class ItemModel:
             conn.close()
     
     @staticmethod
-    def add_item(name: str, category: str, unit: str, stock_qty: int, min_stock: int):
+    def add_item(name: str, category: str, unit: str, unit_cost: float, stock_qty: int, min_stock: int):
         """Add a new inventory item."""
         conn = get_conn()
         try:
             param = _paramstyle()
-            sql = f"INSERT INTO items (name, category, unit, stock_qty, min_stock, created_at) VALUES ({param},{param},{param},{param},{param},{param})"
-            _exec(conn, sql, (name, category, unit, stock_qty, min_stock, datetime.now()))
+            sql = f"INSERT INTO items (name, category, unit, unit_cost, stock_qty, min_stock, created_at) VALUES ({param},{param},{param},{param},{param},{param},{param})"
+            _exec(conn, sql, (name, category, unit, unit_cost, stock_qty, min_stock, datetime.now()))
             conn.commit()
             return True
         except Exception as e:
@@ -327,13 +327,13 @@ class ItemModel:
             conn.close()
     
     @staticmethod
-    def update_item(item_id: int, name: str, category: str, unit: str, stock_qty: int, min_stock: int):
+    def update_item(item_id: int, name: str, category: str, unit: str, unit_cost: float, stock_qty: int, min_stock: int):
         """Update an existing inventory item."""
         conn = get_conn()
         try:
             param = _paramstyle()
-            sql = f"UPDATE items SET name = {param}, category = {param}, unit = {param}, stock_qty = {param}, min_stock = {param} WHERE id = {param}"
-            _exec(conn, sql, (name, category, unit, stock_qty, min_stock, item_id))
+            sql = f"UPDATE items SET name = {param}, category = {param}, unit = {param}, unit_cost = {param}, stock_qty = {param}, min_stock = {param} WHERE id = {param}"
+            _exec(conn, sql, (name, category, unit, unit_cost, stock_qty, min_stock, item_id))
             conn.commit()
             return True
         except Exception as e:
@@ -705,3 +705,132 @@ class DashboardModel:
             'inventory_items': DashboardModel.get_inventory_items_count(),
             'low_stocks': DashboardModel.get_low_stock_count()
         }
+    
+    @staticmethod
+    def get_department_kpis(department=None):
+        """Get KPIs filtered by department.
+        
+        Args:
+            department: Department name to filter by, or None for all departments
+        
+        Returns:
+            dict with inventory_value, inventory_items, and wastages
+        """
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            
+            # Build WHERE clause for department filtering
+            where_clause = ""
+            params = []
+            if department:
+                where_clause = f" WHERE category = {_paramstyle()}"
+                params = [department]
+            
+            # Get inventory value for department
+            sql = f"SELECT SUM(unit_cost * stock_qty) as total_value FROM items{where_clause}"
+            cur.execute(sql, tuple(params) if params else ())
+            row = cur.fetchone()
+            try:
+                inventory_value = float(row['total_value'] if row and row['total_value'] is not None else 0)
+            except (TypeError, KeyError):
+                inventory_value = float(row[0] if row and row[0] is not None else 0)
+            
+            # Get inventory items count for department
+            sql = f"SELECT COUNT(*) as item_count FROM items{where_clause}"
+            cur.execute(sql, tuple(params) if params else ())
+            row = cur.fetchone()
+            try:
+                inventory_items = int(row['item_count'] if row else 0)
+            except (TypeError, KeyError):
+                inventory_items = int(row[0] if row else 0)
+            
+            # Get wastages for department (join damages with items)
+            if department:
+                sql = f"""
+                    SELECT SUM(d.quantity) as total_wastages 
+                    FROM damages d
+                    JOIN items i ON d.item_id = i.id
+                    WHERE i.category = {_paramstyle()}
+                """
+                cur.execute(sql, (department,))
+            else:
+                sql = "SELECT SUM(quantity) as total_wastages FROM damages"
+                cur.execute(sql)
+            row = cur.fetchone()
+            try:
+                wastages = int(row['total_wastages'] if row and row['total_wastages'] is not None else 0)
+            except (TypeError, KeyError):
+                wastages = int(row[0] if row and row[0] is not None else 0)
+            
+            # Format inventory value as currency
+            formatted_value = f"₱{inventory_value:,.2f}"
+            
+            return {
+                'inventory_value': formatted_value,
+                'inventory_items': inventory_items,
+                'wastages': wastages
+            }
+        except Exception as e:
+            print(f"[DASHBOARD] Error getting department KPIs: {e}")
+            return {
+                'inventory_value': '₱0.00',
+                'inventory_items': 0,
+                'wastages': 0
+            }
+        finally:
+            conn.close()
+    
+    @staticmethod
+    def get_department_top_items(department=None, limit=4):
+        """Get top items by stock quantity for a department.
+        
+        Args:
+            department: Department name to filter by, or None for all departments
+            limit: Maximum number of items to return
+        
+        Returns:
+            list of dicts with item name and stock_qty
+        """
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            
+            # Build query with optional department filter
+            if department:
+                sql = f"""
+                    SELECT name, stock_qty 
+                    FROM items 
+                    WHERE category = {_paramstyle()}
+                    ORDER BY stock_qty DESC 
+                    LIMIT {limit}
+                """
+                cur.execute(sql, (department,))
+            else:
+                sql = f"""
+                    SELECT name, stock_qty 
+                    FROM items 
+                    ORDER BY stock_qty DESC 
+                    LIMIT {limit}
+                """
+                cur.execute(sql)
+            
+            rows = cur.fetchall()
+            result = []
+            for r in rows:
+                try:
+                    result.append({
+                        'name': r['name'],
+                        'stock_qty': r['stock_qty']
+                    })
+                except (TypeError, KeyError):
+                    result.append({
+                        'name': r[0],
+                        'stock_qty': r[1]
+                    })
+            return result
+        except Exception as e:
+            print(f"[DASHBOARD] Error getting top items: {e}")
+            return []
+        finally:
+            conn.close()

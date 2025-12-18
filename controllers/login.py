@@ -35,6 +35,6 @@ class LoginController:
             # Switch Windows and update UI based on role
             self.view.hide()
             self.dashboard_view.update_ui_for_role(full_name, role)
-            self.dashboard_view.show()
+            self.dashboard_view.showMaximized()
         else:
             QMessageBox.critical(self.view, "Login Failed", "Invalid email or password.")
