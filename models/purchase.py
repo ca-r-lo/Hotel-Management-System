@@ -367,9 +367,29 @@ class PurchaseModel:
                         'created_by': r[6],
                         'supplier_name': r[7],
                         'supplier_contact': r[8],
-                        'item_count': r[9]
+                        'items_count': r[9]  # Changed from item_count to items_count
                     })
             return result
+        finally:
+            conn.close()
+    
+    @staticmethod
+    def update_order_status(order_id: int, new_status: str):
+        """Update the status of a purchase order."""
+        conn = get_conn()
+        try:
+            param = _paramstyle()
+            sql = f"UPDATE purchases SET status = {param} WHERE id = {param}"
+            _exec(conn, sql, (new_status, order_id))
+            conn.commit()
+            return True
+        except Exception as e:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            print(f"[UPDATE_ORDER_STATUS ERROR] {repr(e)}")
+            return False
         finally:
             conn.close()
 
@@ -392,20 +412,51 @@ class DamageModel:
             return False
         finally:
             conn.close()
+    
+    @staticmethod
+    def add_damage_report(purchase_id: int, category: str, reason: str, created_by: str | None = None):
+        """Add a new damage report."""
+        conn = get_conn()
+        try:
+            param = _paramstyle()
+            sql = f"INSERT INTO damages (purchase_id, category, reason, created_by, created_at, item_id, quantity) VALUES ({param},{param},{param},{param},{param},{param},{param})"
+            # Using item_id=1 and quantity=1 as placeholder since schema requires them
+            _exec(conn, sql, (purchase_id, category, reason, created_by, datetime.now(), 1, 1))
+            conn.commit()
+            return True
+        except Exception as e:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            print(f"[ADD_DAMAGE_REPORT ERROR] {repr(e)}")
+            return False
+        finally:
+            conn.close()
 
     @staticmethod
     def list_damages():
         conn = get_conn()
         try:
             cur = conn.cursor()
-            cur.execute("SELECT id, item_id, quantity, reason, created_by, created_at FROM damages ORDER BY created_at DESC")
+            cur.execute("SELECT id, purchase_id, item_id, category, quantity, reason, status, created_by, created_at FROM damages ORDER BY created_at DESC")
             rows = cur.fetchall()
             result = []
             for r in rows:
                 try:
                     result.append(dict(r))
                 except Exception:
-                    result.append({'id': r[0], 'item_id': r[1], 'quantity': r[2], 'reason': r[3], 'created_by': r[4], 'created_at': r[5]})
+                    result.append({
+                        'id': r[0], 
+                        'purchase_id': r[1], 
+                        'item_id': r[2], 
+                        'category': r[3], 
+                        'quantity': r[4], 
+                        'reason': r[5], 
+                        'status': r[6], 
+                        'created_by': r[7], 
+                        'created_at': r[8]
+                    })
             return result
         finally:
             conn.close()

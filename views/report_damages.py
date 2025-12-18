@@ -5,241 +5,341 @@ from PyQt6.QtWidgets import (
     QAbstractItemView
 )
 from PyQt6.QtCore import Qt, QDate
-from PyQt6.QtGui import QFont, QColor
-from models import purchase as purchase_model
+from PyQt6.QtGui import QFont
+
+# --- Shared Style Constants ---
+STYLE_NAVY = "#111827"
+STYLE_BLUE = "#0056b3"
+STYLE_BORDER = "#d1d5db"
+STYLE_BG_LIGHT = "#f9fafb"
+
+
+class AddDamageReportDialog(QDialog):
+    """Dialog for adding a new damage report."""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("ADD REPORT")
+        self.setFixedSize(550, 500)
+        self.init_ui()
+
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(20)
+        
+        # Set dialog background
+        self.setStyleSheet("QDialog { background-color: white; }")
+
+        # Title
+        title = QLabel("ADD REPORT")
+        title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet(f"color: {STYLE_NAVY}; padding-bottom: 10px; border-bottom: 2px solid {STYLE_BORDER};")
+        layout.addWidget(title)
+
+        # Form fields
+        form_layout = QVBoxLayout()
+        form_layout.setSpacing(15)
+
+        # Order ID (ComboBox)
+        order_row = QHBoxLayout()
+        order_label = QLabel("ORDER ID:")
+        order_label.setFixedWidth(120)
+        order_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold;")
+        self.order_cb = QComboBox()
+        self.order_cb.setFixedHeight(35)
+        self.order_cb.setStyleSheet(f"""
+            QComboBox {{
+                border: 2px solid {STYLE_BORDER};
+                border-radius: 4px;
+                padding: 5px 10px;
+                background-color: white;
+                color: {STYLE_NAVY};
+            }}
+            QComboBox:hover {{ border-color: {STYLE_BLUE}; }}
+            QComboBox QAbstractItemView {{
+                background-color: white;
+                color: {STYLE_NAVY};
+                selection-background-color: {STYLE_BG_LIGHT};
+                selection-color: {STYLE_NAVY};
+            }}
+        """)
+        order_row.addWidget(order_label)
+        order_row.addWidget(self.order_cb)
+        form_layout.addLayout(order_row)
+
+        # Report Date
+        date_row = QHBoxLayout()
+        date_label = QLabel("REPORT DATE:")
+        date_label.setFixedWidth(120)
+        date_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold;")
+        self.date_edit = QDateEdit()
+        self.date_edit.setCalendarPopup(True)
+        self.date_edit.setDate(QDate.currentDate())
+        self.date_edit.setFixedHeight(35)
+        self.date_edit.setStyleSheet(f"""
+            QDateEdit {{
+                border: 2px solid {STYLE_BORDER};
+                border-radius: 4px;
+                padding: 5px 10px;
+                background-color: white;
+                color: {STYLE_NAVY};
+            }}
+            QDateEdit:hover {{ border-color: {STYLE_BLUE}; }}
+        """)
+        date_row.addWidget(date_label)
+        date_row.addWidget(self.date_edit)
+        form_layout.addLayout(date_row)
+
+        # Category
+        category_row = QHBoxLayout()
+        category_label = QLabel("CATEGORY:")
+        category_label.setFixedWidth(120)
+        category_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold;")
+        self.category_cb = QComboBox()
+        self.category_cb.addItems(["Broken", "Expired", "Lost", "Defective", "Other"])
+        self.category_cb.setFixedHeight(35)
+        self.category_cb.setStyleSheet(f"""
+            QComboBox {{
+                border: 2px solid {STYLE_BORDER};
+                border-radius: 4px;
+                padding: 5px 10px;
+                background-color: white;
+                color: {STYLE_NAVY};
+            }}
+            QComboBox:hover {{ border-color: {STYLE_BLUE}; }}
+            QComboBox QAbstractItemView {{
+                background-color: white;
+                color: {STYLE_NAVY};
+                selection-background-color: {STYLE_BG_LIGHT};
+                selection-color: {STYLE_NAVY};
+            }}
+        """)
+        category_row.addWidget(category_label)
+        category_row.addWidget(self.category_cb)
+        form_layout.addLayout(category_row)
+
+        # Description
+        desc_label = QLabel("DESCRIPTION:")
+        desc_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold;")
+        form_layout.addWidget(desc_label)
+        
+        self.description_edit = QTextEdit()
+        self.description_edit.setFixedHeight(120)
+        self.description_edit.setPlaceholderText("Describe the damage...")
+        self.description_edit.setStyleSheet(f"""
+            QTextEdit {{
+                border: 2px solid {STYLE_BORDER};
+                border-radius: 4px;
+                padding: 8px;
+                background-color: white;
+                color: {STYLE_NAVY};
+            }}
+            QTextEdit:focus {{ border-color: {STYLE_BLUE}; }}
+        """)
+        form_layout.addWidget(self.description_edit)
+
+        layout.addLayout(form_layout)
+
+        # Buttons
+        button_row = QHBoxLayout()
+        button_row.addStretch()
+        
+        self.cancel_btn = QPushButton("CANCEL")
+        self.cancel_btn.setFixedSize(100, 40)
+        self.cancel_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: 2px solid {STYLE_BORDER};
+                color: #6b7280;
+                font-weight: bold;
+                border-radius: 4px;
+            }}
+            QPushButton:hover {{ background-color: {STYLE_BG_LIGHT}; }}
+        """)
+        self.cancel_btn.clicked.connect(self.reject)
+        
+        self.add_btn = QPushButton("ADD")
+        self.add_btn.setFixedSize(100, 40)
+        self.add_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {STYLE_NAVY};
+                color: white;
+                border: none;
+                font-weight: bold;
+                border-radius: 4px;
+            }}
+            QPushButton:hover {{ background-color: #0056b3; }}
+        """)
+        
+        button_row.addWidget(self.cancel_btn)
+        button_row.addWidget(self.add_btn)
+        layout.addLayout(button_row)
+
+    def get_data(self):
+        """Return the form data."""
+        return {
+            'purchase_id': self.order_cb.currentData(),
+            'order_display': self.order_cb.currentText(),
+            'report_date': self.date_edit.date().toString("yyyy-MM-dd"),
+            'category': self.category_cb.currentText(),
+            'description': self.description_edit.toPlainText()
+        }
 
 
 class ReportDamagesDialog(QDialog):
+    """Main dialog for viewing and managing damage reports."""
+    
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Report Damages")
-        self.setMinimumSize(900, 700)
-        
-        # Use a very clean, high-contrast theme like the mockup
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #ffffff;
-            }
-            QLabel {
-                color: #000000;
-                font-family: 'Inter', sans-serif;
-            }
-            QLineEdit, QTextEdit, QComboBox, QDateEdit {
-                border: 2px solid #000000;
-                border-radius: 0px;
-                padding: 6px;
-                background-color: #ffffff;
-                color: #000000;
-            }
-            QPushButton {
-                border: 2px solid #000000;
-                border-radius: 0px;
-                padding: 8px 24px;
-                font-weight: bold;
-                background-color: #ffffff;
-                color: #000000;
-            }
-            QPushButton:hover {
-                background-color: #000000;
-                color: #ffffff;
-            }
-            QTableWidget {
-                border: 2px solid #000000;
-                gridline-color: #000000;
-                background-color: #ffffff;
-                color: #000000;
-            }
-            QTableWidget::item {
-                color: #000000;
-                padding: 8px;
-            }
-            QHeaderView::section {
-                background-color: #ffffff;
-                color: #000000;
-                font-weight: bold;
-                border: 1px solid #000000;
-                padding: 4px;
-            }
-        """)
-
+        self.setWindowTitle("REPORT DAMAGES")
+        self.setMinimumSize(1200, 700)
         self.init_ui()
-        
-        # Load data safely
-        try:
-            self.load_orders()
-            self.load_damages()
-        except Exception as e:
-            print(f"Error loading data: {e}")
 
     def init_ui(self):
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(30, 30, 30, 30)
-        main_layout.setSpacing(20)
+        root = QVBoxLayout(self)
+        root.setContentsMargins(30, 30, 30, 30)
+        root.setSpacing(20)
+        
+        # Set dialog background to white
+        self.setStyleSheet("QDialog { background-color: white; }")
 
-        # 1. HEADER
+        # Header with Add Button
+        header_layout = QHBoxLayout()
+        
         title = QLabel("REPORT DAMAGES")
-        title.setFont(QFont("Inter", 18, QFont.Weight.Bold))
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(title)
-
-        # 2. TABLE SECTION
-        self.table = QTableWidget()
-        self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["Report ID", "Report Date", "Category", "Status"])
-        self.table.verticalHeader().setVisible(False)
-        self.table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
-        self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.table.setFixedHeight(200)
-        main_layout.addWidget(self.table)
-
-        # 3. SUB-HEADER (Details row from mockup)
-        details_row = QHBoxLayout()
-        for text in ["Report ID", "Report Date", "Category", "Status"]:
-            lbl = QLabel(text)
-            lbl.setFont(QFont("Inter", 10, QFont.Weight.Bold))
-            details_row.addWidget(lbl)
-        main_layout.addLayout(details_row)
-
-        details_vals = QHBoxLayout()
-        for text in ["Order ID", "Order Date", "Category", "Status"]:
-            lbl = QLabel(text)
-            lbl.setStyleSheet("color: #666;")
-            details_vals.addWidget(lbl)
-        main_layout.addLayout(details_vals)
-
-        # 4. NEW REPORT LINK
+        title.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {STYLE_NAVY};")
+        header_layout.addWidget(title)
+        
+        header_layout.addStretch()
+        
+        # New Report Button
         self.new_report_btn = QPushButton("+ New Report...")
-        self.new_report_btn.setStyleSheet("border: none; text-align: left; color: #000; text-decoration: underline;")
+        self.new_report_btn.setFixedHeight(40)
         self.new_report_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        main_layout.addWidget(self.new_report_btn)
-
-        # 5. ADD REPORT FORM (The centered box)
-        form_container = QFrame()
-        form_container.setFrameShape(QFrame.Shape.Box)
-        form_container.setLineWidth(2)
-        form_container.setStyleSheet("background-color: #ffffff; border: 2px solid #000000;")
+        self.new_report_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {STYLE_NAVY};
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 0 20px;
+                font-weight: bold;
+                font-size: 12px;
+            }}
+            QPushButton:hover {{ background-color: {STYLE_BLUE}; }}
+        """)
+        header_layout.addWidget(self.new_report_btn)
         
-        form_layout = QVBoxLayout(form_container)
-        form_layout.setContentsMargins(40, 20, 40, 20)
-        form_layout.setSpacing(15)
+        root.addLayout(header_layout)
 
-        form_title = QLabel("ADD REPORT")
-        form_title.setFont(QFont("Inter", 12, QFont.Weight.Bold))
-        form_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        form_layout.addWidget(form_title)
-
-        # Grid-like fields
-        grid = QVBoxLayout()
+        # Damages Table
+        self.table = QTableWidget()
+        self.table.setColumnCount(6)
+        self.table.setHorizontalHeaderLabels([
+            "REPORT ID", "REPORT DATE", "ORDER ID", "CATEGORY", "DESCRIPTION", "STATUS"
+        ])
         
-        # Row 1
-        r1 = QHBoxLayout()
-        l1 = QVBoxLayout(); l1.addWidget(QLabel("REPORT ID:")); self.report_id = QLineEdit(); self.report_id.setReadOnly(True); l1.addWidget(self.report_id); r1.addLayout(l1)
-        l2 = QVBoxLayout(); l2.addWidget(QLabel("REPORT DATE:")); self.report_date = QDateEdit(); self.report_date.setDate(QDate.currentDate()); l2.addWidget(self.report_date); r1.addLayout(l2)
-        grid.addLayout(r1)
-
-        # Row 2
-        r2 = QHBoxLayout()
-        l3 = QVBoxLayout(); l3.addWidget(QLabel("ORDER ID:")); self.order_combo = QComboBox(); l3.addWidget(self.order_combo); r2.addLayout(l3)
-        l4 = QVBoxLayout(); l4.addWidget(QLabel("CATEGORY:")); self.category_combo = QComboBox(); self.category_combo.addItems(["Delivery Issue", "Storage Damage", "Expired", "Other"]); l4.addWidget(self.category_combo); r2.addLayout(l4)
-        grid.addLayout(r2)
-
-        # Row 3 (Item - needed for logic)
-        r3 = QHBoxLayout()
-        l5 = QVBoxLayout(); l5.addWidget(QLabel("ITEM:")); self.item_combo = QComboBox(); l5.addWidget(self.item_combo); r3.addLayout(l5)
-        l6 = QVBoxLayout(); l6.addWidget(QLabel("QTY:")); self.qty_input = QLineEdit(); l6.addWidget(self.qty_input); r3.addLayout(l6)
-        grid.addLayout(r3)
-
-        # Row 4 (Description)
-        l7 = QVBoxLayout(); l7.addWidget(QLabel("DESCRIPTION:")); self.desc_input = QTextEdit(); self.desc_input.setMaximumHeight(80); l7.addWidget(self.desc_input); grid.addLayout(l7)
+        self.table.setStyleSheet(f"""
+            QTableWidget {{
+                background-color: white;
+                border: 1px solid {STYLE_BORDER};
+                font-size: 13px;
+                color: {STYLE_NAVY};
+                alternate-background-color: #fcfcfd;
+            }}
+            QHeaderView::section {{
+                background-color: {STYLE_BG_LIGHT};
+                padding: 10px;
+                border: none;
+                border-bottom: 2px solid #e5e7eb;
+                font-weight: bold;
+                font-size: 10px;
+                color: #4b5563;
+                text-transform: uppercase;
+            }}
+            QTableWidget::item {{
+                border-bottom: 1px solid #f3f4f6;
+                padding: 5px;
+                color: {STYLE_NAVY};
+            }}
+        """)
         
-        form_layout.addLayout(grid)
+        # Make table responsive
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)  # REPORT ID
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)  # REPORT DATE
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)  # ORDER ID
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)  # CATEGORY
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)  # DESCRIPTION
+        header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)  # STATUS
+        self.table.verticalHeader().setVisible(False)
+        
+        root.addWidget(self.table)
 
-        # Form Buttons
-        btn_row = QHBoxLayout()
-        self.add_btn = QPushButton("ADD")
-        self.cancel_btn = QPushButton("CANCEL")
-        btn_row.addStretch()
-        btn_row.addWidget(self.add_btn)
-        btn_row.addSpacing(20)
-        btn_row.addWidget(self.cancel_btn)
-        btn_row.addStretch()
-        form_layout.addLayout(btn_row)
+        # Close Button
+        close_row = QHBoxLayout()
+        close_row.addStretch()
+        self.close_btn = QPushButton("CLOSE")
+        self.close_btn.setFixedSize(120, 45)
+        self.close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: 2px solid {STYLE_BORDER};
+                color: #6b7280;
+                font-weight: bold;
+                border-radius: 2px;
+            }}
+            QPushButton:hover {{ background-color: {STYLE_BG_LIGHT}; }}
+        """)
+        self.close_btn.clicked.connect(self.accept)
+        close_row.addWidget(self.close_btn)
+        root.addLayout(close_row)
 
-        main_layout.addWidget(form_container, alignment=Qt.AlignmentFlag.AlignCenter)
-        main_layout.addStretch()
-
-        # Connections
-        self.add_btn.clicked.connect(self.handle_add)
-        self.cancel_btn.clicked.connect(self.reject)
-        self.order_combo.currentIndexChanged.connect(self.on_order_changed)
-
-    def load_orders(self):
-        try:
-            orders = purchase_model.PurchaseModel.list_purchases()
-            self.order_combo.clear()
-            self.order_combo.addItem("Select...", None)
-            for o in orders:
-                self.order_combo.addItem(f"Order #{o['id']}", o['id'])
-        except Exception as e:
-            print(f"Error listing purchases: {e}")
-
-    def on_order_changed(self):
-        try:
-            order_id = self.order_combo.currentData()
-            self.item_combo.clear()
-            if order_id:
-                # Fallback to all items for now
-                items = purchase_model.ItemModel.list_items()
-                for it in items:
-                    self.item_combo.addItem(it['name'], it['id'])
-        except Exception as e:
-            print(f"Error on order change: {e}")
-
-    def load_damages(self):
-        try:
-            damages = purchase_model.DamageModel.list_damages()
-            self.table.setRowCount(0)
-            for r, d in enumerate(damages):
-                self.table.insertRow(r)
-                self.table.setItem(r, 0, QTableWidgetItem(str(d.get('id', ''))))
-                self.table.setItem(r, 1, QTableWidgetItem(str(d.get('created_at', ''))[:10]))
-                self.table.setItem(r, 2, QTableWidgetItem(str(d.get('category', ''))))
-                self.table.setItem(r, 3, QTableWidgetItem(str(d.get('status', 'Reported')).upper()))
-        except Exception as e:
-            print(f"Error loading damages: {e}")
-
-    def handle_add(self):
-        order_id = self.order_combo.currentData()
-        item_id = self.item_combo.currentData()
-        category = self.category_combo.currentText()
-        description = self.desc_input.toPlainText().strip()
-        qty_str = self.qty_input.text().strip()
-
-        if not order_id or not item_id or not description or not qty_str:
-            QMessageBox.warning(self, "Error", "All fields are required.")
-            return
-
-        if not qty_str.isdigit():
-            QMessageBox.warning(self, "Error", "Quantity must be a number.")
-            return
-
-        try:
-            success = purchase_model.DamageModel.log_damage(
-                item_id=item_id,
-                quantity=int(qty_str),
-                reason=description,
-                created_by="Admin",
-                purchase_id=order_id,
-                category=category
-            )
-            if success:
-                QMessageBox.information(self, "Success", "Report added.")
-                self.load_damages()
-                self.desc_input.clear()
-                self.qty_input.clear()
-            else:
-                QMessageBox.critical(self, "Error", "Failed to save report.")
-        except Exception as e:
-            QMessageBox.critical(self, "Error", f"An error occurred: {e}")
+    def populate_table(self, damages):
+        """Populate table with damage reports."""
+        self.table.setRowCount(len(damages))
+        
+        for r_idx, damage in enumerate(damages):
+            # Set row height
+            self.table.setRowHeight(r_idx, 45)
             
+            # Report ID
+            id_item = QTableWidgetItem(str(damage.get('id', '')))
+            self.table.setItem(r_idx, 0, id_item)
+            
+            # Report Date
+            date_item = QTableWidgetItem(str(damage.get('created_at', '')))
+            self.table.setItem(r_idx, 1, date_item)
+            
+            # Order ID
+            order_item = QTableWidgetItem(str(damage.get('purchase_id', '-')))
+            self.table.setItem(r_idx, 2, order_item)
+            
+            # Category
+            category_item = QTableWidgetItem(damage.get('category', '-'))
+            self.table.setItem(r_idx, 3, category_item)
+            
+            # Description (truncated)
+            description = damage.get('reason', '-')
+            if len(description) > 80:
+                description = description[:80] + '...'
+            desc_item = QTableWidgetItem(description)
+            desc_item.setToolTip(damage.get('reason', '-'))  # Show full description on hover
+            self.table.setItem(r_idx, 4, desc_item)
+            
+            # Status with badge
+            status = damage.get('status', 'Reported')
+            status_item = QTableWidgetItem(status.upper())
+            
+            # Color code status
+            from PyQt6.QtGui import QBrush, QColor
+            if status.lower() == 'reported':
+                status_item.setForeground(QBrush(QColor("#f59e0b")))  # Orange
+            elif status.lower() == 'resolved':
+                status_item.setForeground(QBrush(QColor("#10b981")))  # Green
+            
+            self.table.setItem(r_idx, 5, status_item)
+

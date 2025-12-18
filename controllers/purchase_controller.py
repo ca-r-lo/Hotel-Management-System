@@ -10,6 +10,8 @@ class PurchaseController:
         # Connect main dashboard button to open procurement
         self.view.btn_order_stocks.clicked.connect(self.handle_open_order_stocks)
         self.view.btn_suppliers.clicked.connect(self.handle_open_suppliers)
+        self.view.btn_track_orders.clicked.connect(self.handle_open_track_orders)
+        self.view.btn_report_damages.clicked.connect(self.handle_open_report_damages)
         self.refresh_table()
 
     def handle_open_order_stocks(self):
@@ -27,6 +29,22 @@ class PurchaseController:
         controller = SuppliersController(self.view, self.model)
         controller.open_suppliers_management()
         # Refresh history after closing in case suppliers were modified
+        self.refresh_table()
+    
+    def handle_open_track_orders(self):
+        """Opens the Track Orders Dialog using TrackOrdersController."""
+        from controllers.track_orders_controller import TrackOrdersController
+        controller = TrackOrdersController(self.view, self.model)
+        controller.open_track_orders()
+        # Refresh history after closing in case orders were updated
+        self.refresh_table()
+    
+    def handle_open_report_damages(self):
+        """Opens the Report Damages Dialog using ReportDamagesController."""
+        from controllers.report_damages_controller import ReportDamagesController
+        controller = ReportDamagesController(self.view, self.model, self.dashboard)
+        controller.open_report_damages()
+        # Refresh history after closing
         self.refresh_table()
 
     def handle_open_add_item(self, parent_dlg):
