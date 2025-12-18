@@ -4,8 +4,12 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QColor
 from views.purchase_view import PurchasePage
 from views.inventory import InventoryPage
+from views.reports import ReportsPage
+from views.messages import MessagesPage
 from controllers.purchase_controller import PurchaseController
 from controllers.inventory_controller import InventoryController
+from controllers.reports_controller import ReportsController
+from controllers.messages_controller import MessagesController
 from models import purchase as purchase_model
 
 class DashboardWindow(QMainWindow):
@@ -120,15 +124,26 @@ class DashboardWindow(QMainWindow):
         # PAGE 3: INVENTORY
         self.inventory_page = InventoryPage()
         
+        # PAGE 4: REPORTS
+        self.reports_page = ReportsPage()
+        
+        # PAGE 5: MESSAGES
+        self.messages_page = MessagesPage()
+        
         # 5. Logic & Controllers (Initialized now that views exist)
         self.p_model = purchase_model.PurchaseModel()
+        self.m_model = purchase_model.MessageModel()
         self.purchase_ctrl = PurchaseController(self.purchase_page, self.p_model, self)
         self.inventory_ctrl = InventoryController(self.inventory_page, self.p_model)
+        self.reports_ctrl = ReportsController(self.reports_page, self.p_model)
+        self.messages_ctrl = MessagesController(self.messages_page, self.m_model, self)
 
         # 6. Assemble Stack
         self.main_stack.addWidget(self.dash_page)     # Index 0
         self.main_stack.addWidget(self.purchase_page) # Index 1
         self.main_stack.addWidget(self.inventory_page) # Index 2
+        self.main_stack.addWidget(self.reports_page)  # Index 3
+        self.main_stack.addWidget(self.messages_page)  # Index 4
 
         content_main_layout.addWidget(self.main_stack)
         self.main_layout.addWidget(content_container)
@@ -137,6 +152,8 @@ class DashboardWindow(QMainWindow):
         self.nav_btns["DASHBOARD"].clicked.connect(lambda: self.switch_page(0, "DASHBOARD"))
         self.nav_btns["PURCHASE"].clicked.connect(lambda: self.switch_page(1, "PURCHASE"))
         self.nav_btns["INVENTORY"].clicked.connect(lambda: self.switch_page(2, "INVENTORY"))
+        self.nav_btns["REPORTS"].clicked.connect(lambda: self.switch_page(3, "REPORTS"))
+        self.nav_btns["MESSAGES"].clicked.connect(lambda: self.switch_page(4, "MESSAGES"))
 
     def switch_page(self, index, title):
         self.main_stack.setCurrentIndex(index)

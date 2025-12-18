@@ -523,29 +523,71 @@ class DamageModel:
 
 class MessageModel:
     @staticmethod
-    def add_message(title: str, body: str):
+    def add_message(sender_id: int, recipient_id: int, category: str, title: str, body: str):
         conn = get_conn()
         try:
-            _exec(conn, f"INSERT INTO messages (title, body, created_at) VALUES ({_paramstyle()},{_paramstyle()},{_paramstyle()})",
-                  (title, body, datetime.now()))
+            _exec(conn, f"INSERT INTO messages (sender_id, recipient_id, category, title, body, created_at) VALUES ({_paramstyle()},{_paramstyle()},{_paramstyle()},{_paramstyle()},{_paramstyle()},{_paramstyle()})",
+                  (sender_id, recipient_id, category, title, body, datetime.now()))
             conn.commit()
             return True
         finally:
             conn.close()
 
     @staticmethod
-    def list_messages(limit: int = 50):
+    def list_messages(user_id: int, limit: int = 50):
+        """List messages for a specific user (received messages)."""
         conn = get_conn()
         try:
             cur = conn.cursor()
-            cur.execute("SELECT id, title, body, created_at FROM messages ORDER BY created_at DESC LIMIT {}".format(limit))
+            # Get messages where user is the recipient, with sender information
+            cur.execute("""
+                SELECT m.id, m.sender_id, m.recipient_id, m.category, m.title, m.body, m.is_read, m.created_at,
+                       u.full_name as sender_name, u.role as sender_role
+                FROM messages m
+                LEFT JOIN users u ON m.sender_id = u.id
+                WHERE m.recipient_id = {}
+                ORDER BY m.created_at DESC LIMIT {}
+            """.format(_paramstyle(), limit), (user_id,))
             rows = cur.fetchall()
             result = []
             for r in rows:
                 try:
                     result.append(dict(r))
                 except Exception:
-                    result.append({'id': r[0], 'title': r[1], 'body': r[2], 'created_at': r[3]})
+                    result.append({
+                        'id': r[0],
+                        'sender_id': r[1],
+                        'recipient_id': r[2],
+                        'category': r[3],
+                        'title': r[4],
+                        'body': r[5],
+                        'is_read': r[6],
+                        'created_at': r[7],
+                        'sender_name': r[8],
+                        'sender_role': r[9]
+                    })
             return result
+        finally:
+            conn.close()
+    
+    @staticmethod
+    def mark_as_read(message_id: int):
+        """Mark a message as read."""
+        conn = get_conn()
+        try:
+            _exec(conn, f"UPDATE messages SET is_read = 1 WHERE id = {_paramstyle()}", (message_id,))
+            conn.commit()
+            return True
+        finally:
+            conn.close()
+    
+    @staticmethod
+    def delete_message(message_id: int):
+        """Delete a message."""
+        conn = get_conn()
+        try:
+            _exec(conn, f"DELETE FROM messages WHERE id = {_paramstyle()}", (message_id,))
+            conn.commit()
+            return True
         finally:
             conn.close()
