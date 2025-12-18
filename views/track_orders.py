@@ -226,10 +226,12 @@ class TrackOrdersDialog(QDialog):
             action_layout = QHBoxLayout(action_widget)
             action_layout.setContentsMargins(2, 2, 2, 2)
             
+            
             status_dropdown = QComboBox()
             status_dropdown.addItems(["Draft", "Pending", "Delivered", "Cancelled"])
             status_dropdown.setCurrentText(status.capitalize())
             status_dropdown.setFixedHeight(32)
+            
             
             # Style based on current status
             if status.lower() == 'pending':
@@ -248,7 +250,7 @@ class TrackOrdersDialog(QDialog):
             status_dropdown.setStyleSheet(f"""
                 QComboBox {{
                     background-color: {bg_color};
-                    color: white;
+                    color: black;
                     border: none;
                     border-radius: 4px;
                     padding: 5px 10px;

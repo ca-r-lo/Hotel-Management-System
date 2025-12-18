@@ -247,11 +247,11 @@ class DashboardWindow(QMainWindow):
         kpi_row1_layout.setSpacing(20)
         
         # Inventory Value Card
-        inv_value_card, self.inventory_value_label = self._create_kpi_card("0", "Inventory Value")
+        inv_value_card, self.inventory_value_label = self._create_kpi_card("0", "Inventory Value", "inventory_value")
         kpi_row1_layout.addWidget(inv_value_card)
         
         # Wastages Card
-        wastages_card, self.wastages_label = self._create_kpi_card("0", "Wastages")
+        wastages_card, self.wastages_label = self._create_kpi_card("0", "Wastages", "wastages")
         kpi_row1_layout.addWidget(wastages_card)
         
         kpi_grid_layout.addLayout(kpi_row1_layout)
@@ -261,11 +261,11 @@ class DashboardWindow(QMainWindow):
         kpi_row2_layout.setSpacing(20)
         
         # Inventory Items Card
-        inv_items_card, self.inventory_items_label = self._create_kpi_card("0", "Inventory Items")
+        inv_items_card, self.inventory_items_label = self._create_kpi_card("0", "Inventory Items", "inventory_items")
         kpi_row2_layout.addWidget(inv_items_card)
         
         # Low Stocks Card
-        low_stocks_card, self.low_stocks_label = self._create_kpi_card("0", "Low Stocks")
+        low_stocks_card, self.low_stocks_label = self._create_kpi_card("0", "Low Stocks", "low_stocks")
         kpi_row2_layout.addWidget(low_stocks_card)
         
         kpi_grid_layout.addLayout(kpi_row2_layout)
@@ -452,7 +452,7 @@ class DashboardWindow(QMainWindow):
             import traceback
             traceback.print_exc()
     
-    def _create_kpi_card(self, value, title):
+    def _create_kpi_card(self, value, title, kpi_type=None):
         """Create a KPI card widget and return both card and value label."""
         card = QFrame()
         card.setMinimumHeight(200)
@@ -462,7 +462,16 @@ class DashboardWindow(QMainWindow):
                 border: 2px solid #e5e7eb;
                 border-radius: 8px;
             }
+            QFrame:hover {
+                border-color: #0056b3;
+                background-color: #f9fafb;
+                cursor: pointer;
+            }
         """)
+        card.setProperty("kpi_type", kpi_type)
+        
+        # Make card clickable
+        card.mousePressEvent = lambda event: self.handle_kpi_click(kpi_type)
         
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(30, 30, 30, 30)
@@ -482,7 +491,171 @@ class DashboardWindow(QMainWindow):
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         card_layout.addWidget(title_label)
         
+        # Click hint
+        if kpi_type:
+            hint_label = QLabel("Click to view details")
+            hint_label.setFont(QFont("Arial", 10))
+            hint_label.setStyleSheet("border: none; color: #9ca3af; font-size: 10px;")
+            hint_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            card_layout.addWidget(hint_label)
+        
         return card, value_label
+    
+    def handle_kpi_click(self, kpi_type):
+        """Handle KPI card click to show detailed data."""
+        if not kpi_type:
+            return
+        
+        from views.kpi_details import InventoryValueDialog, WastagesDialog, LowStocksDialog
+        from models.database import get_conn, _paramstyle
+        
+        try:
+            if kpi_type == "inventory_value":
+                # Show inventory value breakdown
+                dialog = InventoryValueDialog(self, self.current_department if self.current_role == "Department" else None)
+                
+                # Fetch inventory data
+                conn = get_conn()
+                cur = conn.cursor()
+                
+                if self.current_role == "Department" and self.current_department:
+                    # Department-specific items
+                    cur.execute(
+                        f"SELECT name, category, unit, stock_qty, unit_cost FROM items WHERE category = {_paramstyle()} ORDER BY name",
+                        (self.current_department,)
+                    )
+                else:
+                    # All items
+                    cur.execute("SELECT name, category, unit, stock_qty, unit_cost FROM items ORDER BY name")
+                
+                rows = cur.fetchall()
+                items = []
+                for row in rows:
+                    try:
+                        items.append(dict(row))
+                    except:
+                        items.append({
+                            'name': row[0],
+                            'category': row[1],
+                            'unit': row[2],
+                            'stock_qty': row[3],
+                            'unit_cost': row[4]
+                        })
+                
+                conn.close()
+                dialog.populate_data(items)
+                dialog.exec()
+            
+            elif kpi_type == "wastages":
+                # Show damage reports
+                dialog = WastagesDialog(self)
+                
+                # Fetch damages data
+                conn = get_conn()
+                cur = conn.cursor()
+                cur.execute("""
+                    SELECT d.created_at, i.name as item_name, d.quantity, d.reason, d.created_by
+                    FROM damages d
+                    LEFT JOIN items i ON d.item_id = i.id
+                    ORDER BY d.created_at DESC
+                """)
+                
+                rows = cur.fetchall()
+                damages = []
+                for row in rows:
+                    try:
+                        damages.append(dict(row))
+                    except:
+                        damages.append({
+                            'created_at': row[0],
+                            'item_name': row[1],
+                            'quantity': row[2],
+                            'reason': row[3],
+                            'created_by': row[4]
+                        })
+                
+                conn.close()
+                dialog.populate_data(damages)
+                dialog.exec()
+            
+            elif kpi_type == "inventory_items":
+                # Show all inventory items (same as inventory value but different focus)
+                dialog = InventoryValueDialog(self, self.current_department if self.current_role == "Department" else None)
+                
+                # Fetch inventory data
+                conn = get_conn()
+                cur = conn.cursor()
+                
+                if self.current_role == "Department" and self.current_department:
+                    cur.execute(
+                        f"SELECT name, category, unit, stock_qty, unit_cost FROM items WHERE category = {_paramstyle()} ORDER BY name",
+                        (self.current_department,)
+                    )
+                else:
+                    cur.execute("SELECT name, category, unit, stock_qty, unit_cost FROM items ORDER BY name")
+                
+                rows = cur.fetchall()
+                items = []
+                for row in rows:
+                    try:
+                        items.append(dict(row))
+                    except:
+                        items.append({
+                            'name': row[0],
+                            'category': row[1],
+                            'unit': row[2],
+                            'stock_qty': row[3],
+                            'unit_cost': row[4]
+                        })
+                
+                conn.close()
+                dialog.populate_data(items)
+                dialog.exec()
+            
+            elif kpi_type == "low_stocks":
+                # Show low stock items
+                dialog = LowStocksDialog(self, self.current_department if self.current_role == "Department" else None)
+                
+                # Fetch low stock items
+                conn = get_conn()
+                cur = conn.cursor()
+                
+                if self.current_role == "Department" and self.current_department:
+                    cur.execute(
+                        f"SELECT name, category, stock_qty, min_stock FROM items WHERE category = {_paramstyle()} AND stock_qty <= min_stock ORDER BY stock_qty ASC",
+                        (self.current_department,)
+                    )
+                else:
+                    cur.execute("SELECT name, category, stock_qty, min_stock FROM items WHERE stock_qty <= min_stock ORDER BY stock_qty ASC")
+                
+                rows = cur.fetchall()
+                items = []
+                for row in rows:
+                    try:
+                        items.append(dict(row))
+                    except:
+                        items.append({
+                            'name': row[0],
+                            'category': row[1],
+                            'stock_qty': row[2],
+                            'min_stock': row[3]
+                        })
+                
+                conn.close()
+                dialog.populate_data(items)
+                dialog.exec()
+        
+        except Exception as e:
+            from PyQt6.QtWidgets import QMessageBox
+            msg = QMessageBox(self)
+            msg.setIcon(QMessageBox.Icon.Warning)
+            msg.setWindowTitle("Error")
+            msg.setText(f"Failed to load KPI details: {str(e)}")
+            msg.setStyleSheet("QLabel { color: #000000; }")
+            msg.exec()
+            print(f"Error loading KPI details: {e}")
+            import traceback
+            traceback.print_exc()
     
     def handle_logout(self):
         """Handle logout - clear session and return to login."""

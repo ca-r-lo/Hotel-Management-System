@@ -510,10 +510,36 @@ class DamageModel:
         conn = get_conn()
         try:
             param = _paramstyle()
+            
+            # Get the first item from this purchase order
+            cur = conn.cursor()
+            cur.execute(f"SELECT item_id FROM purchase_items WHERE purchase_id = {param} LIMIT 1", (purchase_id,))
+            row = cur.fetchone()
+            
+            if not row:
+                print(f"[ADD_DAMAGE_REPORT ERROR] No items found for purchase_id {purchase_id}")
+                # Get any item from the items table as fallback
+                cur.execute("SELECT id FROM items LIMIT 1")
+                fallback_row = cur.fetchone()
+                if not fallback_row:
+                    print(f"[ADD_DAMAGE_REPORT ERROR] No items exist in items table")
+                    return False
+                item_id = fallback_row[0] if isinstance(fallback_row, (list, tuple)) else fallback_row['id']
+                print(f"[ADD_DAMAGE_REPORT] Using fallback item_id: {item_id}")
+            else:
+                item_id = row[0] if isinstance(row, (list, tuple)) else row['item_id']
+                print(f"[ADD_DAMAGE_REPORT] Using item_id from purchase: {item_id}")
+            
+            # Verify the item exists
+            cur.execute(f"SELECT id FROM items WHERE id = {param}", (item_id,))
+            if not cur.fetchone():
+                print(f"[ADD_DAMAGE_REPORT ERROR] Item {item_id} does not exist in items table")
+                return False
+            
             sql = f"INSERT INTO damages (purchase_id, category, reason, created_by, created_at, item_id, quantity) VALUES ({param},{param},{param},{param},{param},{param},{param})"
-            # Using item_id=1 and quantity=1 as placeholder since schema requires them
-            _exec(conn, sql, (purchase_id, category, reason, created_by, datetime.now(), 1, 1))
+            _exec(conn, sql, (purchase_id, category, reason, created_by, datetime.now(), item_id, 1))
             conn.commit()
+            print(f"[ADD_DAMAGE_REPORT] Successfully added damage report for purchase {purchase_id}")
             return True
         except Exception as e:
             try:
@@ -521,6 +547,8 @@ class DamageModel:
             except Exception:
                 pass
             print(f"[ADD_DAMAGE_REPORT ERROR] {repr(e)}")
+            import traceback
+            traceback.print_exc()
             return False
         finally:
             conn.close()
