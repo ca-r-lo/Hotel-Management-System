@@ -19,16 +19,22 @@ class ReportsController:
         self.model = model
         
         # Connect action buttons - updated button names
-        self.view.btn_view_reports.clicked.connect(self.handle_stock_summary)
-        self.view.btn_generate_reports.clicked.connect(self.handle_usage_data)
-        self.view.btn_summary.clicked.connect(self.handle_purchasing_trends)
+        self.view.btn_view_reports.clicked.connect(self.handle_stock_levels)
+        self.view.btn_generate_reports.clicked.connect(self.handle_usage_history)
+        self.view.btn_summary.clicked.connect(self.handle_low_stock_alert)
         self.view.btn_export.clicked.connect(self.handle_export_report)
         
         # Connect filters
         self.view.year_filter.currentTextChanged.connect(self.handle_filter_change)
         self.view.month_filter.currentTextChanged.connect(self.handle_filter_change)
+    
+    def set_user_info(self, user_name, user_role, department):
+        """Set current user information."""
+        self.view.current_user = user_name
+        self.view.current_role = user_role
+        self.view.current_department = department
         
-        # Load initial charts
+        # Load initial charts with department filter
         self.refresh_charts()
     
     def handle_filter_change(self):
@@ -36,114 +42,224 @@ class ReportsController:
         self.refresh_charts()
     
     def refresh_charts(self):
-        """Refresh chart data based on current filters."""
+        """Refresh chart data based on current filters and department."""
         try:
-            year = self.view.year_filter.currentText()
-            month = self.view.month_filter.currentText()
+            # Fetch inventory data for pie chart (department-specific)
+            inventory_data = self.get_department_stock_levels()
             
-            # Fetch inventory data grouped by category
-            inventory_data = self.get_inventory_by_category()
-            
-            # Fetch purchase trend data
-            trend_data = self.get_purchase_trends(year, month)
+            # Fetch stock trend data for line chart
+            trend_data = self.get_stock_trend_data()
             
             # Update the charts in the view
             self.view.update_charts(inventory_data, trend_data)
             
         except Exception as e:
             print(f"Error refreshing charts: {e}")
+            import traceback
+            traceback.print_exc()
     
-    def get_inventory_by_category(self):
-        """Get inventory value grouped by category."""
+    def get_department_stock_levels(self):
+        """Get stock levels for the current department (for pie chart)."""
         try:
             item_model = ItemModel()
             items = item_model.list_items()
             
-            # Group by category and calculate total value
-            category_totals = {}
-            for item in items:
-                category = item.get('category') or "Uncategorized"
-                stock_qty = item.get('stock_qty') or 0
-                unit_cost = item.get('unit_cost') or 0
-                total_value = stock_qty * unit_cost
-                
-                if category in category_totals:
-                    category_totals[category] += total_value
-                else:
-                    category_totals[category] = total_value
+            # Filter by department if Department role
+            if self.view.current_role == "Department" and self.view.current_department:
+                items = [item for item in items 
+                        if item.get('category', '').lower() == self.view.current_department.lower()]
             
-            # Convert to list of tuples for pie chart
-            return [(cat, val) for cat, val in category_totals.items() if val > 0]
+            # Return list of (item_name, stock_qty)
+            result = []
+            for item in items:
+                name = item.get('name', 'Unknown')
+                stock_qty = item.get('stock_qty', 0)
+                if stock_qty > 0:  # Only show items with stock
+                    result.append((name, stock_qty))
+            
+            # Sort by stock quantity descending and take top 10
+            result.sort(key=lambda x: x[1], reverse=True)
+            return result[:10] if len(result) > 10 else result
+            
         except Exception as e:
-            print(f"Error getting inventory by category: {e}")
+            print(f"Error getting department stock levels: {e}")
             import traceback
             traceback.print_exc()
             return []
     
-    def get_purchase_trends(self, year, month):
-        """Get purchase trends over time."""
+    def get_stock_trend_data(self):
+        """Get stock trend data for line chart."""
         try:
-            purchases = self.model.list_purchases()
+            item_model = ItemModel()
+            items = item_model.list_items()
             
-            # Group purchases by month and status
-            from datetime import datetime
+            # Filter by department if Department role
+            if self.view.current_role == "Department" and self.view.current_department:
+                items = [item for item in items 
+                        if item.get('category', '').lower() == self.view.current_department.lower()]
             
-            monthly_data = {
-                "Pending": {},
-                "Delivered": {},
-                "Cancelled": {}
-            }
+            # Return list of (item_name, stock_qty) for all items
+            result = []
+            for item in items:
+                name = item.get('name', 'Unknown')
+                stock_qty = item.get('stock_qty', 0)
+                result.append((name, stock_qty))
             
-            for purchase in purchases:
-                created_at = purchase.get('created_at')
-                status = purchase.get('status', '').capitalize()
-                total_amount = purchase.get('total_amount') or 0
-                
-                if created_at:
-                    # Parse the date
-                    if isinstance(created_at, str):
-                        try:
-                            purchase_date = datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")
-                        except ValueError:
-                            try:
-                                purchase_date = datetime.strptime(created_at, "%Y-%m-%d")
-                            except ValueError:
-                                continue
-                    else:
-                        purchase_date = created_at
-                    
-                    # Filter by year if specified
-                    if year != "All" and str(purchase_date.year) != year:
-                        continue
-                    
-                    # Filter by month if specified
-                    if month != "All":
-                        month_num = ["January", "February", "March", "April", "May", "June",
-                                   "July", "August", "September", "October", "November", "December"].index(month) + 1
-                        if purchase_date.month != month_num:
-                            continue
-                    
-                    month_key = purchase_date.month
-                    
-                    if status in monthly_data:
-                        if month_key in monthly_data[status]:
-                            monthly_data[status][month_key] += total_amount
-                        else:
-                            monthly_data[status][month_key] = total_amount
+            # Sort by name
+            result.sort(key=lambda x: x[0])
+            return result
             
-            # Convert to format expected by line chart
-            trend_data = {}
-            for status, months in monthly_data.items():
-                if months:  # Only include if there's data
-                    points = sorted([(month, amount) for month, amount in months.items()])
-                    trend_data[status] = points
-            
-            return trend_data
         except Exception as e:
-            print(f"Error getting purchase trends: {e}")
+            print(f"Error getting stock trend data: {e}")
             import traceback
             traceback.print_exc()
-            return {}
+            return []
+    
+    def handle_stock_levels(self):
+        """Show stock levels report."""
+        msg = QMessageBox(self.view)
+        msg.setIcon(QMessageBox.Icon.Information)
+        msg.setWindowTitle("Stock Levels")
+        msg.setText("Stock levels are displayed in the charts below.")
+        msg.setStyleSheet("""
+            QMessageBox { background-color: white; }
+            QLabel { color: #111827; font-size: 13px; }
+            QPushButton { 
+                background-color: #0056b3; 
+                color: white; 
+                border: none; 
+                padding: 8px 20px; 
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #003d82; }
+        """)
+        msg.exec()
+    
+    def handle_usage_history(self):
+        """Show usage history report."""
+        msg = QMessageBox(self.view)
+        msg.setIcon(QMessageBox.Icon.Information)
+        msg.setWindowTitle("Usage History")
+        msg.setText("Usage history reporting coming soon!")
+        msg.setStyleSheet("""
+            QMessageBox { background-color: white; }
+            QLabel { color: #111827; font-size: 13px; }
+            QPushButton { 
+                background-color: #0056b3; 
+                color: white; 
+                border: none; 
+                padding: 8px 20px; 
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #003d82; }
+        """)
+        msg.exec()
+    
+    def handle_low_stock_alert(self):
+        """Show low stock alert report."""
+        try:
+            item_model = ItemModel()
+            items = item_model.list_items()
+            
+            # Filter by department if Department role
+            if self.view.current_role == "Department" and self.view.current_department:
+                items = [item for item in items 
+                        if item.get('category', '').lower() == self.view.current_department.lower()]
+            
+            # Find low stock items
+            low_stock_items = [item for item in items 
+                             if item.get('stock_qty', 0) <= item.get('min_stock', 0)]
+            
+            if not low_stock_items:
+                msg = QMessageBox(self.view)
+                msg.setIcon(QMessageBox.Icon.Information)
+                msg.setWindowTitle("Low Stock Alert")
+                msg.setText("No low stock items found.")
+                msg.setStyleSheet("""
+                    QMessageBox { background-color: white; }
+                    QLabel { color: #111827; font-size: 13px; }
+                    QPushButton { 
+                        background-color: #10b981; 
+                        color: white; 
+                        border: none; 
+                        padding: 8px 20px; 
+                        border-radius: 4px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover { background-color: #059669; }
+                """)
+                msg.exec()
+            else:
+                alert_text = f"Found {len(low_stock_items)} low stock items:\n\n"
+                for item in low_stock_items[:5]:  # Show first 5
+                    alert_text += f"• {item.get('name')}: {item.get('stock_qty')} {item.get('unit')} (Min: {item.get('min_stock')})\n"
+                
+                if len(low_stock_items) > 5:
+                    alert_text += f"\n... and {len(low_stock_items) - 5} more items"
+                
+                msg = QMessageBox(self.view)
+                msg.setIcon(QMessageBox.Icon.Warning)
+                msg.setWindowTitle("Low Stock Alert")
+                msg.setText(alert_text)
+                msg.setStyleSheet("""
+                    QMessageBox { background-color: white; }
+                    QLabel { color: #111827; font-size: 13px; }
+                    QPushButton { 
+                        background-color: #f59e0b; 
+                        color: white; 
+                        border: none; 
+                        padding: 8px 20px; 
+                        border-radius: 4px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover { background-color: #d97706; }
+                """)
+                msg.exec()
+                
+        except Exception as e:
+            msg = QMessageBox(self.view)
+            msg.setIcon(QMessageBox.Icon.Critical)
+            msg.setWindowTitle("Error")
+            msg.setText(f"Failed to check low stock items:\n{e}")
+            msg.setStyleSheet("""
+                QMessageBox { background-color: white; }
+                QLabel { color: #111827; font-size: 13px; }
+                QPushButton { 
+                    background-color: #ef4444; 
+                    color: white; 
+                    border: none; 
+                    padding: 8px 20px; 
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #dc2626; }
+            """)
+            msg.exec()
+    
+    def handle_export_report(self):
+        """Export current report data."""
+        msg = QMessageBox(self.view)
+        msg.setIcon(QMessageBox.Icon.Information)
+        msg.setWindowTitle("Export Report")
+        msg.setText("Export functionality coming soon!")
+        msg.setStyleSheet("""
+            QMessageBox { background-color: white; }
+            QLabel { color: #111827; font-size: 13px; }
+            QPushButton { 
+                background-color: #0056b3; 
+                color: white; 
+                border: none; 
+                padding: 8px 20px; 
+                border-radius: 4px;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #003d82; }
+        """)
+        msg.exec()
+    
+    # Old methods below (kept for compatibility with other roles)
     
     def handle_stock_summary(self):
         """Generate and display stock summary report."""

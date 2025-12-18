@@ -91,42 +91,43 @@ class InventoryController:
             status_item.setData(Qt.ItemDataRole.UserRole, {'stock_qty': stock_qty, 'min_stock': min_stock})
             self.view.table.setItem(r_idx, 3, status_item)
             
-            # Action Buttons
-            action_widget = QFrame()
-            action_layout = QHBoxLayout(action_widget)
-            action_layout.setContentsMargins(2, 2, 2, 2)
-            action_layout.setSpacing(6)
-            
-            # Edit button with icon
-            edit_btn = QPushButton()
-            edit_btn.setIcon(create_edit_icon(16))
-            edit_btn.setFixedSize(32, 32)
-            edit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            edit_btn.setToolTip("Edit Item")
-            edit_btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: {STYLE_BLUE};
-                    color: white;
-                    border: none;
-                    border-radius: 4px;
-                    padding: 4px;
-                }}
-                QPushButton:hover {{ 
-                    background-color: #003d82;
-                    border: 2px solid #ffffff;
-                }}
-            """)
-            edit_btn.clicked.connect(lambda checked, i=item: self.handle_edit_item(i))
-            
-            # More button with icon
-            more_btn = QPushButton()
-            more_btn.setIcon(create_more_icon(16))
-            more_btn.setFixedSize(32, 32)
-            more_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            more_btn.setToolTip("More Options")
-            more_btn.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: #6b7280;
+            # Action Buttons (only show for non-Department roles)
+            if self.view.current_role != "Department":
+                action_widget = QFrame()
+                action_layout = QHBoxLayout(action_widget)
+                action_layout.setContentsMargins(2, 2, 2, 2)
+                action_layout.setSpacing(6)
+                
+                # Edit button with icon
+                edit_btn = QPushButton()
+                edit_btn.setIcon(create_edit_icon(16))
+                edit_btn.setFixedSize(32, 32)
+                edit_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                edit_btn.setToolTip("Edit Item")
+                edit_btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: {STYLE_BLUE};
+                        color: white;
+                        border: none;
+                        border-radius: 4px;
+                        padding: 4px;
+                    }}
+                    QPushButton:hover {{ 
+                        background-color: #003d82;
+                        border: 2px solid #ffffff;
+                    }}
+                """)
+                edit_btn.clicked.connect(lambda checked, i=item: self.handle_edit_item(i))
+                
+                # More button with icon
+                more_btn = QPushButton()
+                more_btn.setIcon(create_more_icon(16))
+                more_btn.setFixedSize(32, 32)
+                more_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                more_btn.setToolTip("More Options")
+                more_btn.setStyleSheet(f"""
+                    QPushButton {{
+                        background-color: #6b7280;
                     color: white;
                     border: none;
                     border-radius: 4px;
@@ -138,11 +139,15 @@ class InventoryController:
                 }}
             """)
             
-            action_layout.addWidget(edit_btn)
-            action_layout.addWidget(more_btn)
-            action_layout.addStretch()
-            
-            self.view.table.setCellWidget(r_idx, 4, action_widget)
+                action_layout.addWidget(edit_btn)
+                action_layout.addWidget(more_btn)
+                action_layout.addStretch()
+                
+                self.view.table.setCellWidget(r_idx, 4, action_widget)
+            else:
+                # For Department role, leave the actions column empty
+                empty_widget = QFrame()
+                self.view.table.setCellWidget(r_idx, 4, empty_widget)
     
     def handle_add_stock(self):
         """Handle adding a new inventory item."""

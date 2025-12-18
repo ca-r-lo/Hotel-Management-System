@@ -4,7 +4,7 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem, QHeaderView, QScrollArea
 )
 from PyQt6.QtCore import Qt, QDate
-from PyQt6.QtGui import QFont, QPainter
+from PyQt6.QtGui import QFont, QPainter, QPen, QColor
 from PyQt6.QtCharts import QChart, QChartView, QPieSeries, QLineSeries, QValueAxis
 from PyQt6.QtCore import Qt as QtCore
 
@@ -296,6 +296,9 @@ class GenerateReportDialog(QDialog):
 class ReportsPage(QWidget):
     def __init__(self):
         super().__init__()
+        self.current_role = None
+        self.current_department = None
+        self.current_user = None
         self.init_ui()
 
     def init_ui(self):
@@ -306,7 +309,7 @@ class ReportsPage(QWidget):
         # Header with Title
         header_layout = QHBoxLayout()
         
-        title = QLabel("REPORT MANAGEMENT")
+        title = QLabel("USAGE REPORTS")
         title.setFont(QFont("Arial", 24, QFont.Weight.Bold))
         title.setStyleSheet(f"color: {STYLE_NAVY};")
         header_layout.addWidget(title)
@@ -318,9 +321,9 @@ class ReportsPage(QWidget):
         actions_layout = QHBoxLayout()
         actions_layout.setSpacing(12)
         
-        self.btn_view_reports = QPushButton("STOCK SUMMARY")
-        self.btn_generate_reports = QPushButton("USAGE DATA")
-        self.btn_summary = QPushButton("PURCHASING TRENDS")
+        self.btn_view_reports = QPushButton("STOCK LEVELS")
+        self.btn_generate_reports = QPushButton("USAGE HISTORY")
+        self.btn_summary = QPushButton("LOW STOCK ALERT")
         self.btn_export = QPushButton("EXPORT REPORT")
 
         self.actions = [self.btn_view_reports, self.btn_generate_reports, self.btn_summary, self.btn_export]
@@ -344,7 +347,11 @@ class ReportsPage(QWidget):
                 }}
             """)
             actions_layout.addWidget(btn)
-        self.layout.addLayout(actions_layout)
+        
+        # Create actions container to hide for Department role if needed
+        self.actions_container = QWidget()
+        self.actions_container.setLayout(actions_layout)
+        self.layout.addWidget(self.actions_container)
 
         # Filters Row
         filters_layout = QHBoxLayout()
@@ -449,44 +456,50 @@ class ReportsPage(QWidget):
         self.line_view.setChart(self.line_chart)
 
     def create_inventory_pie_chart(self, inventory_data):
-        """Create a pie chart showing inventory distribution by category."""
+        """Create a pie chart showing inventory distribution by item or stock levels."""
         series = QPieSeries()
         
         if not inventory_data or len(inventory_data) == 0:
             # Show placeholder if no data
             series.append("No Data", 100)
+            slice_item = series.slices()[0]
+            slice_item.setColor(Qt.GlobalColor.lightGray)
         else:
-            # Group by category and calculate totals
-            for category, total_value in inventory_data:
-                series.append(f"{category}", total_value)
+            # Add data to pie chart
+            for item_name, value in inventory_data:
+                series.append(f"{item_name}: {int(value)}", value)
         
         # Style slices with different colors
         colors = [
-            Qt.GlobalColor.cyan,
-            Qt.GlobalColor.blue,
-            Qt.GlobalColor.darkBlue,
-            Qt.GlobalColor.magenta,
-            Qt.GlobalColor.darkMagenta,
-            Qt.GlobalColor.green,
-            Qt.GlobalColor.darkGreen,
-            Qt.GlobalColor.yellow,
-            Qt.GlobalColor.red
+            "#0056b3",  # Blue
+            "#10b981",  # Green  
+            "#f59e0b",  # Orange
+            "#ef4444",  # Red
+            "#8b5cf6",  # Purple
+            "#06b6d4",  # Cyan
+            "#ec4899",  # Pink
+            "#f97316",  # Orange-red
+            "#14b8a6",  # Teal
         ]
         
         for i, slice_item in enumerate(series.slices()):
             slice_item.setLabelVisible(True)
-            slice_item.setColor(colors[i % len(colors)])
+            slice_item.setPen(QPen(Qt.PenStyle.NoPen))
+            if inventory_data and len(inventory_data) > 0:
+                slice_item.setColor(QColor(colors[i % len(colors)]))
         
         chart = QChart()
         chart.addSeries(series)
-        chart.setTitle("")
-        chart.legend().setVisible(False)
+        chart.setTitle("Stock Distribution")
+        chart.setTitleFont(QFont("Arial", 14, QFont.Weight.Bold))
+        chart.legend().setVisible(True)
+        chart.legend().setAlignment(Qt.AlignmentFlag.AlignBottom)
         chart.setBackgroundVisible(False)
         
         return chart
 
     def create_trend_line_chart(self, trend_data):
-        """Create a line chart showing purchase trends over time."""
+        """Create a line chart showing stock levels over time or comparison."""
         chart = QChart()
         
         if not trend_data or len(trend_data) == 0:
@@ -496,18 +509,27 @@ class ReportsPage(QWidget):
             series.append(0, 0)
             chart.addSeries(series)
         else:
-            # trend_data should be dict with format: {series_name: [(x, y), (x, y), ...]}
-            for series_name, points in trend_data.items():
-                series = QLineSeries()
-                series.setName(series_name)
-                for x, y in points:
-                    series.append(x, y)
-                chart.addSeries(series)
+            # trend_data should be list of tuples: [(item_name, quantity), ...]
+            # Convert to line series for display
+            series = QLineSeries()
+            series.setName("Stock Levels")
+            
+            for i, (item_name, quantity) in enumerate(trend_data):
+                series.append(i, quantity)
+            
+            chart.addSeries(series)
         
-        chart.setTitle("")
+        chart.setTitle("Stock Levels Overview")
+        chart.setTitleFont(QFont("Arial", 14, QFont.Weight.Bold))
         chart.createDefaultAxes()
+        
+        # Style axes
+        for axis in chart.axes():
+            axis.setLabelsColor(STYLE_NAVY)
+            axis.setGridLineColor(STYLE_BORDER)
+        
         chart.legend().setVisible(True)
-        chart.legend().setAlignment(Qt.AlignmentFlag.AlignTop)
+        chart.legend().setAlignment(Qt.AlignmentFlag.AlignBottom)
         chart.setBackgroundVisible(False)
         
         return chart

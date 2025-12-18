@@ -13,6 +13,11 @@ except Exception:
 DB_PATH = os.path.join(os.path.dirname(__file__), 'hms.db')
 
 
+def _paramstyle():
+    """Return the appropriate parameter placeholder for the current DB driver."""
+    return "%s" if DB_DRIVER == 'mariadb' else "?"
+
+
 def get_conn():
     if DB_DRIVER == 'mariadb':
         return mariadb.connect(

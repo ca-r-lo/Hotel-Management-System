@@ -7,12 +7,14 @@ from views.inventory import InventoryPage
 from views.reports import ReportsPage
 from views.messages import MessagesPage
 from views.trans_history import TransactionHistoryPage
+from views.requests import RequestsPage
 from views.dept_overview import DepartmentOverviewPage
 from controllers.purchase_controller import PurchaseController
 from controllers.inventory_controller import InventoryController
 from controllers.reports_controller import ReportsController
 from controllers.messages_controller import MessagesController
 from controllers.trans_history_controller import TransactionHistoryController
+from controllers.requests_controller import RequestsController
 from controllers.dept_overview_controller import DeptOverviewController
 from models import purchase as purchase_model
 
@@ -21,7 +23,14 @@ class DashboardWindow(QMainWindow):
     ROLE_PAGES = {
         'Purchase Admin': ['DASHBOARD', 'PURCHASE', 'INVENTORY', 'REPORTS', 'MESSAGES'],
         'Owner': ['DASHBOARD', 'TRANS HISTORY', 'DEPT OVERVIEW', 'REPORTS', 'MESSAGES'],
-        'Department Manager': ['DASHBOARD', 'PURCHASE', 'INVENTORY', 'MESSAGES']
+        # Department role has Requests page and Reports; no Purchase
+        'Department': ['DASHBOARD', 'INVENTORY', 'REQUESTS', 'REPORTS', 'MESSAGES']
+    }
+    
+    # Department assignments for Department Managers (would normally come from database)
+    DEPARTMENT_ASSIGNMENTS = {
+        'Department': 'Housekeeping',  # Default assignment
+        # Could be expanded to map specific users to departments
     }
     
     def __init__(self):
@@ -29,6 +38,7 @@ class DashboardWindow(QMainWindow):
         self.setWindowTitle("STASH - Hotel Management System")
         self.current_user = None  # Store logged-in user name
         self.current_role = None  # Store logged-in user role
+        self.current_department = None  # Store logged-in user department
         self.init_ui()
 
     def init_ui(self):
@@ -102,7 +112,7 @@ class DashboardWindow(QMainWindow):
         sidebar_layout.addWidget(separator1)
 
         self.nav_btns = {}
-        nav_pages = ["DASHBOARD", "TRANS HISTORY", "DEPT OVERVIEW", "PURCHASE", "INVENTORY", "REPORTS", "MESSAGES"]
+        nav_pages = ["DASHBOARD", "TRANS HISTORY", "DEPT OVERVIEW", "PURCHASE", "INVENTORY", "REQUESTS", "REPORTS", "MESSAGES"]
         for text in nav_pages:
             btn = QPushButton(text)
             if text == "DASHBOARD": btn.setObjectName("ActiveNav")
@@ -254,7 +264,10 @@ class DashboardWindow(QMainWindow):
         # PAGE 5: INVENTORY
         self.inventory_page = InventoryPage()
         
-        # PAGE 6: REPORTS
+        # PAGE 6: REQUESTS (Department role)
+        self.requests_page = RequestsPage()
+        
+        # PAGE 7: REPORTS
         self.reports_page = ReportsPage()
         
         # PAGE 7: MESSAGES
@@ -266,6 +279,7 @@ class DashboardWindow(QMainWindow):
         self.purchase_ctrl = PurchaseController(self.purchase_page, self.p_model, self)
         self.inventory_ctrl = InventoryController(self.inventory_page, self.p_model)
         self.reports_ctrl = ReportsController(self.reports_page, self.p_model)
+        self.requests_ctrl = RequestsController(self.requests_page)
         self.messages_ctrl = MessagesController(self.messages_page, self.m_model, self)
         self.trans_history_ctrl = TransactionHistoryController(self.trans_history_page, self.p_model)
         self.dept_overview_ctrl = DeptOverviewController(self.dept_overview_page)
@@ -276,8 +290,9 @@ class DashboardWindow(QMainWindow):
         self.main_stack.addWidget(self.dept_overview_page) # Index 2
         self.main_stack.addWidget(self.purchase_page)      # Index 3
         self.main_stack.addWidget(self.inventory_page)     # Index 4
-        self.main_stack.addWidget(self.reports_page)       # Index 5
-        self.main_stack.addWidget(self.messages_page)      # Index 6
+        self.main_stack.addWidget(self.requests_page)      # Index 5
+        self.main_stack.addWidget(self.reports_page)       # Index 6
+        self.main_stack.addWidget(self.messages_page)      # Index 7
 
         content_main_layout.addWidget(self.main_stack)
         self.main_layout.addWidget(content_container)
@@ -288,16 +303,18 @@ class DashboardWindow(QMainWindow):
         self.nav_btns["DEPT OVERVIEW"].clicked.connect(lambda: self.switch_page(2, "DEPT OVERVIEW"))
         self.nav_btns["PURCHASE"].clicked.connect(lambda: self.switch_page(3, "PURCHASE"))
         self.nav_btns["INVENTORY"].clicked.connect(lambda: self.switch_page(4, "INVENTORY"))
-        self.nav_btns["REPORTS"].clicked.connect(lambda: self.switch_page(5, "REPORTS"))
-        self.nav_btns["MESSAGES"].clicked.connect(lambda: self.switch_page(6, "MESSAGES"))
+        self.nav_btns["REQUESTS"].clicked.connect(lambda: self.switch_page(5, "REQUESTS"))
+        self.nav_btns["REPORTS"].clicked.connect(lambda: self.switch_page(6, "REPORTS"))
+        self.nav_btns["MESSAGES"].clicked.connect(lambda: self.switch_page(7, "MESSAGES"))
         
         # Connect Logout
         self.logout_btn.clicked.connect(self.handle_logout)
 
-    def update_ui_for_role(self, user_name, user_role):
+    def update_ui_for_role(self, user_name, user_role, user_department=None):
         """Update UI based on user role - show/hide navigation buttons."""
         self.current_user = user_name
         self.current_role = user_role
+        self.current_department = user_department
         
         # Update profile labels
         self.name_lbl.setText(user_name)
@@ -312,6 +329,28 @@ class DashboardWindow(QMainWindow):
                 btn.setVisible(True)
             else:
                 btn.setVisible(False)
+        
+        # Update inventory page UI based on role
+        if user_role == "Department":
+            # Use the department from the database, or default to Housekeeping
+            department = user_department or self.DEPARTMENT_ASSIGNMENTS.get(user_role, "Housekeeping")
+            self.inventory_page.update_ui_for_role(user_role, department)
+            # Trigger refresh with department filter
+            self.inventory_ctrl.current_category_filter = department
+            self.inventory_ctrl.refresh_inventory()
+            
+            # Set user info for requests page
+            self.requests_ctrl.set_user_info(user_name, user_role, department)
+            
+            # Set user info for reports page
+            self.reports_ctrl.set_user_info(user_name, user_role, department)
+        else:
+            self.inventory_page.update_ui_for_role(user_role)
+            # Set user info for requests page (for Purchase Admin/Owner)
+            self.requests_ctrl.set_user_info(user_name, user_role, None)
+            
+            # Set user info for reports page
+            self.reports_ctrl.set_user_info(user_name, user_role, None)
         
         # Switch to dashboard on login
         self.switch_page(0, "DASHBOARD")
@@ -343,23 +382,49 @@ class DashboardWindow(QMainWindow):
         try:
             from models.purchase import DashboardModel
             
-            kpis = DashboardModel.get_all_kpis()
-            
-            # Update Inventory Value (format as currency)
-            inventory_value = kpis['inventory_value']
-            self.inventory_value_label.setText(f"₱ {inventory_value:,.2f}")
-            
-            # Update Wastages
-            wastages = kpis['wastages']
-            self.wastages_label.setText(str(wastages))
-            
-            # Update Inventory Items
-            inventory_items = kpis['inventory_items']
-            self.inventory_items_label.setText(str(inventory_items))
-            
-            # Update Low Stocks
-            low_stocks = kpis['low_stocks']
-            self.low_stocks_label.setText(str(low_stocks))
+            # Use department-specific KPIs for Department role
+            if self.current_role == "Department":
+                # Get department assignment from user's department or default
+                department_filter = self.current_department or self.DEPARTMENT_ASSIGNMENTS.get(self.current_role, "Housekeeping")
+                kpis = DashboardModel.get_department_kpis(department_filter)
+                
+                # Update with formatted department values
+                self.inventory_value_label.setText(kpis['inventory_value'])
+                self.wastages_label.setText(str(kpis['wastages']))
+                self.inventory_items_label.setText(str(kpis['inventory_items']))
+                
+                # For department role, calculate low stocks in their department
+                try:
+                    from models.database import get_conn, _paramstyle
+                    conn = get_conn()
+                    cur = conn.cursor()
+                    cur.execute(f"SELECT COUNT(*) FROM items WHERE category = {_paramstyle()} AND stock_qty <= min_stock", (department_filter,))
+                    row = cur.fetchone()
+                    low_stocks = int(row[0] if row else 0)
+                    conn.close()
+                except Exception:
+                    low_stocks = 0
+                
+                self.low_stocks_label.setText(str(low_stocks))
+            else:
+                # For other roles (Owner, Purchase Admin), show all data
+                kpis = DashboardModel.get_all_kpis()
+                
+                # Update Inventory Value (format as currency)
+                inventory_value = kpis['inventory_value']
+                self.inventory_value_label.setText(f"₱ {inventory_value:,.2f}")
+                
+                # Update Wastages
+                wastages = kpis['wastages']
+                self.wastages_label.setText(str(wastages))
+                
+                # Update Inventory Items
+                inventory_items = kpis['inventory_items']
+                self.inventory_items_label.setText(str(inventory_items))
+                
+                # Update Low Stocks
+                low_stocks = kpis['low_stocks']
+                self.low_stocks_label.setText(str(low_stocks))
             
         except Exception as e:
             print(f"Error refreshing dashboard KPIs: {e}")

@@ -12,11 +12,11 @@ class UserModel:
             
             # Simple query for demonstration. 
             # Note: Use password hashing (like bcrypt) for real applications.
-            query = "SELECT full_name, role FROM users WHERE email = ? AND password = ?"
+            query = "SELECT full_name, role, department FROM users WHERE email = ? AND password = ?"
             cur.execute(query, (email, password))
             
             user = cur.fetchone()
-            return user  # Returns (name, role) if found, else None
+            return user  # Returns (name, role, department) if found, else None
             
         except mariadb.Error as e:
             print(f"Database error: {e}")

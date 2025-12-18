@@ -23,7 +23,7 @@ class LoginController:
         user_data = self.model.authenticate(email, password)
 
         if user_data:
-            full_name, role = user_data
+            full_name, role, department = user_data
             print(f"Login successful for {full_name}")
 
             # Initialize database tables
@@ -34,7 +34,7 @@ class LoginController:
 
             # Switch Windows and update UI based on role
             self.view.hide()
-            self.dashboard_view.update_ui_for_role(full_name, role)
+            self.dashboard_view.update_ui_for_role(full_name, role, department)
             self.dashboard_view.showMaximized()
         else:
             QMessageBox.critical(self.view, "Login Failed", "Invalid email or password.")

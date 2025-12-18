@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame,
     QTableWidget, QTableWidgetItem, QHeaderView, QComboBox, QDialog,
-    QLineEdit, QMessageBox, QSpinBox
+    QLineEdit, QMessageBox, QSpinBox, QMainWindow
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QIcon, QPixmap, QPainter, QColor
@@ -301,6 +301,8 @@ class AddStockDialog(QDialog):
 class InventoryPage(QWidget):
     def __init__(self):
         super().__init__()
+        self.current_role = None
+        self.current_department = None
         self.init_ui()
 
     def init_ui(self):
@@ -309,19 +311,19 @@ class InventoryPage(QWidget):
         self.layout.setSpacing(20)
 
         # Header with Title
-        header_layout = QHBoxLayout()
+        # header_layout = QHBoxLayout()
         
-        title = QLabel("INVENTORY")
-        title.setFont(QFont("Arial", 24, QFont.Weight.Bold))
-        title.setStyleSheet(f"color: {STYLE_NAVY};")
-        header_layout.addWidget(title)
-        header_layout.addStretch()
+        # title = QLabel("INVENTORY")
+        # title.setFont(QFont("Arial", 24, QFont.Weight.Bold))
+        # title.setStyleSheet(f"color: {STYLE_NAVY};")
+        # header_layout.addWidget(title)
+        # header_layout.addStretch()
         
-        self.layout.addLayout(header_layout)
+        # self.layout.addLayout(header_layout)
 
-        # Action Buttons Row
-        actions_layout = QHBoxLayout()
-        actions_layout.setSpacing(12)
+        # Action Buttons Row (will be hidden for Department role)
+        self.actions_layout = QHBoxLayout()
+        self.actions_layout.setSpacing(12)
         
         self.btn_add_stocks = QPushButton("ADD STOCKS")
         self.btn_distribute_stocks = QPushButton("DISTRIBUTE STOCKS")
@@ -348,17 +350,21 @@ class InventoryPage(QWidget):
                     color: {STYLE_BLUE}; 
                 }}
             """)
-            actions_layout.addWidget(btn)
-        self.layout.addLayout(actions_layout)
+            self.actions_layout.addWidget(btn)
+        
+        # Create a container widget for actions so we can hide it
+        self.actions_container = QWidget()
+        self.actions_container.setLayout(self.actions_layout)
+        self.layout.addWidget(self.actions_container)
 
         # Filters Row
         filters_layout = QHBoxLayout()
         filters_layout.setSpacing(12)
         
-        # Department Filter
-        dept_label = QLabel("DEPARTMENT:")
-        dept_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold; font-size: 11px;")
-        filters_layout.addWidget(dept_label)
+        # Department Filter (hidden for Department role)
+        self.dept_label = QLabel("DEPARTMENT:")
+        self.dept_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold; font-size: 11px;")
+        filters_layout.addWidget(self.dept_label)
         
         self.dept_filter = QComboBox()
         self.dept_filter.addItems(["All Departments", "Housekeeping", "Kitchen", "Front Desk", "Maintenance"])
@@ -385,13 +391,13 @@ class InventoryPage(QWidget):
         
         filters_layout.addSpacing(20)
         
-        # Category Filter
-        cat_label = QLabel("CATEGORY:")
-        cat_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold; font-size: 11px;")
-        filters_layout.addWidget(cat_label)
+        # Category Filter (shown for Department role, hidden for others)
+        self.cat_label = QLabel("CATEGORY:")
+        self.cat_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold; font-size: 11px;")
+        filters_layout.addWidget(self.cat_label)
         
         self.category_filter = QComboBox()
-        self.category_filter.addItems(["All Categories", "General", "Room Supplies", "Kitchen", "Cleaning", "Toiletries"])
+        self.category_filter.addItems(["All Categories", "General", "Room Supplies", "Kitchen", "Housekeeping", "Cleaning", "Toiletries"])
         self.category_filter.setFixedWidth(180)
         self.category_filter.setStyleSheet(f"""
             QComboBox {{
@@ -465,3 +471,65 @@ class InventoryPage(QWidget):
         
         container_layout.addWidget(self.table)
         self.layout.addWidget(table_container)
+
+    def update_ui_for_role(self, role, department=None):
+        """Update UI based on user role."""
+        self.current_role = role
+        self.current_department = department
+        
+        if role == "Department":
+            # Hide action buttons for Department role
+            self.actions_container.setVisible(False)
+            
+            # Hide department filter, show only category
+            self.dept_label.setVisible(False)
+            self.dept_filter.setVisible(False)
+            
+            # Set category filter to department's category if provided
+            if department:
+                index = self.category_filter.findText(department)
+                if index >= 0:
+                    self.category_filter.setCurrentIndex(index)
+                # Disable the dropdown so department users can only see their department
+                self.category_filter.setEnabled(False)
+        else:
+            # Show all controls for other roles (Purchase Admin, Owner)
+            self.actions_container.setVisible(True)
+            self.dept_label.setVisible(True)
+            self.dept_filter.setVisible(True)
+            self.category_filter.setEnabled(True)
+
+
+class InventoryWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Inventory - Department")
+        self.init_ui()
+
+    def init_ui(self):
+        # Main layout setup
+        self.main_widget = QWidget()
+        self.main_layout = QVBoxLayout(self.main_widget)
+        self.setCentralWidget(self.main_widget)
+
+        # Category dropdown for department-specific stocks
+        self.category_label = QLabel("CATEGORY:")
+        self.category_label.setStyleSheet("font-weight: bold; font-size: 14px;")
+        self.category_dropdown = QComboBox()
+        self.category_dropdown.addItems(["Housekeeping", "Maintenance", "Kitchen"])
+
+        # Table for inventory items
+        self.inventory_table = QTableWidget()
+        self.inventory_table.setColumnCount(4)
+        self.inventory_table.setHorizontalHeaderLabels(["Item Name", "Unit", "Stock Level", "Status"])
+
+        # Add widgets to layout
+        self.main_layout.addWidget(self.category_label)
+        self.main_layout.addWidget(self.category_dropdown)
+        self.main_layout.addWidget(self.inventory_table)
+
+        # Remove top row buttons (not included in this layout)
+
+    def load_department_inventory(self, department):
+        # Logic to load inventory for the selected department
+        pass
