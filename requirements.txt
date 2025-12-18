@@ -1,0 +1,120 @@
+# =====================================================
+# HMS (Hotel Management System) - Python Dependencies
+# =====================================================
+# Install all dependencies with: pip install -r requirements.txt
+
+# =====================================================
+# Core Framework - GUI
+# =====================================================
+PyQt6==6.6.1
+PyQt6-Qt6==6.6.1
+PyQt6-sip==13.6.0
+
+# =====================================================
+# Database Connectivity
+# =====================================================
+mariadb==1.1.8
+
+# =====================================================
+# Data Processing & Analysis
+# =====================================================
+# For reports and data analysis
+pandas==2.1.4
+numpy==1.26.2
+
+# =====================================================
+# Charting & Visualization
+# =====================================================
+# For reports page charts and graphs
+matplotlib==3.8.2
+
+# =====================================================
+# Date & Time Handling
+# =====================================================
+python-dateutil==2.8.2
+
+# =====================================================
+# Optional - Enhanced Features
+# =====================================================
+
+# PDF Generation (for exporting reports)
+# reportlab==4.0.7
+
+# Excel Export Support
+# openpyxl==3.1.2
+# xlsxwriter==3.1.9
+
+# Email Support (for notifications)
+# secure-smtplib==0.1.1
+
+# Barcode/QR Code Generation (for SKU/items)
+# python-barcode==0.15.1
+# qrcode==7.4.2
+# Pillow==10.1.0
+
+# Password Hashing (recommended for production)
+# bcrypt==4.1.2
+
+# Environment Variables Management
+# python-dotenv==1.0.0
+
+# Logging Enhancement
+# colorlog==6.8.0
+
+# =====================================================
+# Development Dependencies (Optional)
+# =====================================================
+
+# Code Formatting
+# black==23.12.1
+
+# Linting
+# pylint==3.0.3
+# flake8==7.0.0
+
+# Testing
+# pytest==7.4.3
+# pytest-qt==4.2.0
+
+# =====================================================
+# Platform-Specific Notes
+# =====================================================
+# 
+# macOS:
+#   - May require: xcode-select --install
+#   - For mariadb: brew install mariadb-connector-c
+#
+# Linux (Ubuntu/Debian):
+#   - sudo apt-get install libmariadb-dev
+#   - sudo apt-get install python3-dev
+#
+# Windows:
+#   - Install Visual C++ Build Tools if compilation fails
+#   - Download MariaDB Connector/C from official website
+#
+# =====================================================
+# Installation Instructions
+# =====================================================
+#
+# 1. Create virtual environment (recommended):
+#    python3 -m venv .venv
+#    source .venv/bin/activate  # On macOS/Linux
+#    .venv\Scripts\activate     # On Windows
+#
+# 2. Upgrade pip:
+#    pip install --upgrade pip
+#
+# 3. Install dependencies:
+#    pip install -r requirements.txt
+#
+# 4. For development (with optional packages):
+#    # Uncomment optional packages above, then:
+#    pip install -r requirements.txt
+#
+# =====================================================
+# Version Compatibility
+# =====================================================
+# Python Version: 3.11+ (tested on 3.11, 3.12)
+# OS: macOS, Linux, Windows
+#
+# =====================================================

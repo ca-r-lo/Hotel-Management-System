@@ -263,11 +263,19 @@ class TrackOrdersDialog(QDialog):
                     padding-right: 5px;
                 }}
                 QComboBox QAbstractItemView {{
-                    background-color: white;
-                    color: {STYLE_NAVY};
-                    selection-background-color: {STYLE_BG_LIGHT};
-                    selection-color: {STYLE_NAVY};
+                    background-color: white !important;
                     border: 1px solid {STYLE_BORDER};
+                }}
+                QComboBox QAbstractItemView::item {{
+                    color: #000000 !important;
+                    background-color: white;
+                    padding: 8px 12px;
+                    font-weight: bold;
+                    font-size: 12px;
+                }}
+                QComboBox QAbstractItemView::item:selected {{
+                    background-color: {STYLE_BG_LIGHT} !important;
+                    color: #000000 !important;
                 }}
             """)
             status_dropdown.currentTextChanged.connect(

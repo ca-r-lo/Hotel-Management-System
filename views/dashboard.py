@@ -512,8 +512,37 @@ class DashboardWindow(QMainWindow):
         if title == "DASHBOARD":
             self.refresh_dashboard_kpis()
         
+        # Refresh transaction history when switching to trans history page
+        elif title == "TRANS HISTORY":
+            self.trans_history_ctrl.refresh_transactions()
+        
+        # Refresh department overview when switching to dept overview page
+        elif title == "DEPT OVERVIEW":
+            # Load data for all departments or specific department
+            if self.current_role == "Department" and self.current_department:
+                self.dept_overview_ctrl.load_department_data(self.current_department)
+            else:
+                # For Owner, show first department or all
+                self.dept_overview_ctrl.load_department_data("Housekeeping")
+        
+        # Refresh purchase page when switching to purchase page
+        elif title == "PURCHASE":
+            self.purchase_ctrl.refresh_table()
+        
+        # Refresh inventory when switching to inventory page
+        elif title == "INVENTORY":
+            self.inventory_ctrl.refresh_inventory()
+        
+        # Refresh requests when switching to requests page
+        elif title == "REQUESTS":
+            self.requests_ctrl.refresh_requests()
+        
+        # Refresh reports when switching to reports page
+        elif title == "REPORTS":
+            self.reports_ctrl.refresh_charts()
+        
         # Refresh messages when switching to messages page
-        if title == "MESSAGES" and self.current_user:
+        elif title == "MESSAGES" and self.current_user:
             # Update the current user ID and refresh messages
             self.messages_ctrl.current_user_id = self.messages_ctrl.get_current_user_id()
             self.messages_ctrl.refresh_messages()

@@ -1,7 +1,7 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame,
     QTableWidget, QTableWidgetItem, QHeaderView, QComboBox, QDialog,
-    QLineEdit, QMessageBox, QSpinBox, QMainWindow, QScrollArea
+    QLineEdit, QMessageBox, QSpinBox, QMainWindow, QScrollArea, QSizePolicy
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QIcon, QPixmap, QPainter, QColor, QBrush
@@ -82,25 +82,57 @@ class AddStockDialog(QDialog):
         self.item_data = item_data
         self.is_edit_mode = item_data is not None
         self.setWindowTitle("EDIT ITEM" if self.is_edit_mode else "ADD STOCKS")
-        self.setFixedSize(550, 550)
+        # Make dialog resizable with minimum and initial size
+        self.setMinimumSize(480, 500)
+        self.resize(550, 550)
+        # Allow dialog to be resizable
+        self.setSizeGripEnabled(True)
         self.init_ui()
         
         if self.is_edit_mode:
             self.populate_fields()
 
     def init_ui(self):
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(30, 30, 30, 30)
-        layout.setSpacing(20)
+        # Main layout for the dialog
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
         
         # Set dialog background
-        self.setStyleSheet("QDialog { background-color: white; }")
+        self.setStyleSheet(f"""
+            QDialog {{ background-color: white; }}
+            QScrollArea {{
+                border: none;
+                background-color: white;
+            }}
+            QScrollArea > QWidget {{
+                background-color: white;
+            }}
+            QScrollArea > QWidget > QWidget {{
+                background-color: white;
+            }}
+        """)
+
+        # Create scroll area for content
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        
+        # Content widget inside scroll area
+        content_widget = QWidget()
+        content_widget.setStyleSheet("background-color: white;")
+        layout = QVBoxLayout(content_widget)
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(20)
 
         # Title
         title = QLabel("EDIT ITEM" if self.is_edit_mode else "ADD STOCKS")
         title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet(f"color: {STYLE_NAVY}; padding-bottom: 10px; border-bottom: 2px solid {STYLE_BORDER};")
+        title.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         layout.addWidget(title)
 
         # Form fields
@@ -113,7 +145,7 @@ class AddStockDialog(QDialog):
         form_layout.addWidget(name_label)
         
         self.name_edit = QLineEdit()
-        self.name_edit.setFixedHeight(35)
+        self.name_edit.setMinimumHeight(35)
         self.name_edit.setPlaceholderText("Enter item name")
         self.name_edit.setStyleSheet(f"""
             QLineEdit {{
@@ -125,6 +157,7 @@ class AddStockDialog(QDialog):
             }}
             QLineEdit:focus {{ border-color: {STYLE_BLUE}; }}
         """)
+        self.name_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         form_layout.addWidget(self.name_edit)
 
         # Category
@@ -134,7 +167,7 @@ class AddStockDialog(QDialog):
         
         self.category_cb = QComboBox()
         self.category_cb.addItems(["General", "Room Supplies", "Kitchen", "Cleaning", "Toiletries", "Other"])
-        self.category_cb.setFixedHeight(35)
+        self.category_cb.setMinimumHeight(35)
         self.category_cb.setStyleSheet(f"""
             QComboBox {{
                 border: 2px solid {STYLE_BORDER};
@@ -151,6 +184,7 @@ class AddStockDialog(QDialog):
                 selection-color: {STYLE_NAVY};
             }}
         """)
+        self.category_cb.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         form_layout.addWidget(self.category_cb)
 
         # Unit
@@ -159,7 +193,7 @@ class AddStockDialog(QDialog):
         form_layout.addWidget(unit_label)
         
         self.unit_edit = QLineEdit()
-        self.unit_edit.setFixedHeight(35)
+        self.unit_edit.setMinimumHeight(35)
         self.unit_edit.setPlaceholderText("e.g., pcs, boxes, kg")
         self.unit_edit.setStyleSheet(f"""
             QLineEdit {{
@@ -171,6 +205,7 @@ class AddStockDialog(QDialog):
             }}
             QLineEdit:focus {{ border-color: {STYLE_BLUE}; }}
         """)
+        self.unit_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         form_layout.addWidget(self.unit_edit)
 
         # Unit Cost
@@ -180,7 +215,7 @@ class AddStockDialog(QDialog):
         
         self.unit_cost_spin = QSpinBox()
         self.unit_cost_spin.setRange(0, 999999)
-        self.unit_cost_spin.setFixedHeight(35)
+        self.unit_cost_spin.setMinimumHeight(35)
         self.unit_cost_spin.setPrefix("₱ ")
         self.unit_cost_spin.setStyleSheet(f"""
             QSpinBox {{
@@ -192,6 +227,7 @@ class AddStockDialog(QDialog):
             }}
             QSpinBox:focus {{ border-color: {STYLE_BLUE}; }}
         """)
+        self.unit_cost_spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         form_layout.addWidget(self.unit_cost_spin)
 
         # Stock Quantity
@@ -201,7 +237,7 @@ class AddStockDialog(QDialog):
         
         self.stock_spin = QSpinBox()
         self.stock_spin.setRange(0, 999999)
-        self.stock_spin.setFixedHeight(35)
+        self.stock_spin.setMinimumHeight(35)
         self.stock_spin.setStyleSheet(f"""
             QSpinBox {{
                 border: 2px solid {STYLE_BORDER};
@@ -212,6 +248,7 @@ class AddStockDialog(QDialog):
             }}
             QSpinBox:focus {{ border-color: {STYLE_BLUE}; }}
         """)
+        self.stock_spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         form_layout.addWidget(self.stock_spin)
 
         # Minimum Stock Level
@@ -221,7 +258,7 @@ class AddStockDialog(QDialog):
         
         self.min_spin = QSpinBox()
         self.min_spin.setRange(0, 999999)
-        self.min_spin.setFixedHeight(35)
+        self.min_spin.setMinimumHeight(35)
         self.min_spin.setStyleSheet(f"""
             QSpinBox {{
                 border: 2px solid {STYLE_BORDER};
@@ -232,13 +269,26 @@ class AddStockDialog(QDialog):
             }}
             QSpinBox:focus {{ border-color: {STYLE_BLUE}; }}
         """)
+        self.min_spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         form_layout.addWidget(self.min_spin)
 
         layout.addLayout(form_layout)
+        
+        # Add stretch to push content to top when scrolling not needed
+        layout.addStretch()
 
-        # Buttons
-        button_row = QHBoxLayout()
-        button_row.addStretch()
+        # Set content widget to scroll area
+        scroll_area.setWidget(content_widget)
+        
+        # Add scroll area to main layout
+        main_layout.addWidget(scroll_area)
+
+        # Button container (fixed at bottom, not in scroll area)
+        button_container = QWidget()
+        button_container.setStyleSheet("background-color: white; border-top: 1px solid #e5e7eb;")
+        button_layout = QHBoxLayout(button_container)
+        button_layout.setContentsMargins(30, 15, 30, 15)
+        button_layout.addStretch()
         
         self.cancel_btn = QPushButton("CANCEL")
         self.cancel_btn.setFixedSize(100, 40)
@@ -267,9 +317,9 @@ class AddStockDialog(QDialog):
             QPushButton:hover {{ background-color: {STYLE_BLUE}; }}
         """)
         
-        button_row.addWidget(self.cancel_btn)
-        button_row.addWidget(self.save_btn)
-        layout.addLayout(button_row)
+        button_layout.addWidget(self.cancel_btn)
+        button_layout.addWidget(self.save_btn)
+        main_layout.addWidget(button_container)
 
     def populate_fields(self):
         """Populate fields when editing."""
