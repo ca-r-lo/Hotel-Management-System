@@ -3,7 +3,9 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QColor
 from views.purchase_view import PurchasePage
+from views.inventory import InventoryPage
 from controllers.purchase_controller import PurchaseController
+from controllers.inventory_controller import InventoryController
 from models import purchase as purchase_model
 
 class DashboardWindow(QMainWindow):
@@ -115,13 +117,18 @@ class DashboardWindow(QMainWindow):
         # PAGE 2: PURCHASE (Initialized and added AFTER self.main_stack exists)
         self.purchase_page = PurchasePage()
         
+        # PAGE 3: INVENTORY
+        self.inventory_page = InventoryPage()
+        
         # 5. Logic & Controllers (Initialized now that views exist)
         self.p_model = purchase_model.PurchaseModel()
         self.purchase_ctrl = PurchaseController(self.purchase_page, self.p_model, self)
+        self.inventory_ctrl = InventoryController(self.inventory_page, self.p_model)
 
         # 6. Assemble Stack
         self.main_stack.addWidget(self.dash_page)     # Index 0
         self.main_stack.addWidget(self.purchase_page) # Index 1
+        self.main_stack.addWidget(self.inventory_page) # Index 2
 
         content_main_layout.addWidget(self.main_stack)
         self.main_layout.addWidget(content_container)
@@ -129,6 +136,7 @@ class DashboardWindow(QMainWindow):
         # 7. Connect Navigation
         self.nav_btns["DASHBOARD"].clicked.connect(lambda: self.switch_page(0, "DASHBOARD"))
         self.nav_btns["PURCHASE"].clicked.connect(lambda: self.switch_page(1, "PURCHASE"))
+        self.nav_btns["INVENTORY"].clicked.connect(lambda: self.switch_page(2, "INVENTORY"))
 
     def switch_page(self, index, title):
         self.main_stack.setCurrentIndex(index)

@@ -234,14 +234,24 @@ class ItemModel:
         conn = get_conn()
         try:
             cur = conn.cursor()
-            cur.execute("SELECT id, name, stock FROM items ORDER BY name")
+            cur.execute("SELECT id, name, sku, unit, unit_cost, stock_qty, min_stock, category, created_at FROM items ORDER BY name")
             rows = cur.fetchall()
             result = []
             for r in rows:
                 try:
                     result.append(dict(r))
                 except Exception:
-                    result.append({'id': r[0], 'name': r[1], 'stock': r[2]})
+                    result.append({
+                        'id': r[0], 
+                        'name': r[1], 
+                        'sku': r[2], 
+                        'unit': r[3], 
+                        'unit_cost': r[4], 
+                        'stock_qty': r[5], 
+                        'min_stock': r[6], 
+                        'category': r[7], 
+                        'created_at': r[8]
+                    })
             return result
         finally:
             conn.close()
@@ -251,14 +261,23 @@ class ItemModel:
         conn = get_conn()
         try:
             cur = conn.cursor()
-            cur.execute("SELECT id, name, stock FROM items WHERE id = {}".format(_paramstyle()), (iid,))
+            cur.execute("SELECT id, name, sku, unit, unit_cost, stock_qty, min_stock, category FROM items WHERE id = {}".format(_paramstyle()), (iid,))
             row = cur.fetchone()
             if not row:
                 return None
             try:
                 return dict(row)
             except Exception:
-                return {'id': row[0], 'name': row[1], 'stock': row[2]}
+                return {
+                    'id': row[0], 
+                    'name': row[1], 
+                    'sku': row[2], 
+                    'unit': row[3], 
+                    'unit_cost': row[4], 
+                    'stock_qty': row[5], 
+                    'min_stock': row[6], 
+                    'category': row[7]
+                }
         finally:
             conn.close()
 
@@ -267,10 +286,50 @@ class ItemModel:
         conn = get_conn()
         try:
             cur = conn.cursor()
-            cur.execute("UPDATE items SET stock = COALESCE(stock,0) + %s WHERE id = %s" % (_paramstyle(), _paramstyle()), (delta, item_id))
+            cur.execute("UPDATE items SET stock_qty = COALESCE(stock_qty,0) + {} WHERE id = {}".format(_paramstyle(), _paramstyle()), (delta, item_id))
             conn.commit()
             return True
         except Exception:
+            return False
+        finally:
+            conn.close()
+    
+    @staticmethod
+    def add_item(name: str, category: str, unit: str, stock_qty: int, min_stock: int):
+        """Add a new inventory item."""
+        conn = get_conn()
+        try:
+            param = _paramstyle()
+            sql = f"INSERT INTO items (name, category, unit, stock_qty, min_stock, created_at) VALUES ({param},{param},{param},{param},{param},{param})"
+            _exec(conn, sql, (name, category, unit, stock_qty, min_stock, datetime.now()))
+            conn.commit()
+            return True
+        except Exception as e:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            print(f"[ADD_ITEM ERROR] {repr(e)}")
+            return False
+        finally:
+            conn.close()
+    
+    @staticmethod
+    def update_item(item_id: int, name: str, category: str, unit: str, stock_qty: int, min_stock: int):
+        """Update an existing inventory item."""
+        conn = get_conn()
+        try:
+            param = _paramstyle()
+            sql = f"UPDATE items SET name = {param}, category = {param}, unit = {param}, stock_qty = {param}, min_stock = {param} WHERE id = {param}"
+            _exec(conn, sql, (name, category, unit, stock_qty, min_stock, item_id))
+            conn.commit()
+            return True
+        except Exception as e:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            print(f"[UPDATE_ITEM ERROR] {repr(e)}")
             return False
         finally:
             conn.close()
