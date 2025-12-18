@@ -525,8 +525,8 @@ class ReportsPage(QWidget):
         
         # Style axes
         for axis in chart.axes():
-            axis.setLabelsColor(STYLE_NAVY)
-            axis.setGridLineColor(STYLE_BORDER)
+            axis.setLabelsColor(QColor(STYLE_NAVY))
+            axis.setGridLineColor(QColor(STYLE_BORDER))
         
         chart.legend().setVisible(True)
         chart.legend().setAlignment(Qt.AlignmentFlag.AlignBottom)

@@ -188,6 +188,172 @@ class SendRequestDialog(QDialog):
         }
 
 
+class DistributeStockDialog(QDialog):
+    """Dialog for distributing stock when approving a request."""
+    
+    def __init__(self, parent=None, request=None):
+        super().__init__(parent)
+        self.request = request
+        self.setWindowTitle("DISTRIBUTE STOCK")
+        self.setFixedSize(550, 450)
+        self.init_ui()
+    
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(20)
+        
+        self.setStyleSheet(f"""
+            QDialog {{ 
+                background-color: white; 
+            }}
+            QLabel {{
+                color: {STYLE_NAVY};
+            }}
+        """)
+        
+        # Title
+        title = QLabel("DISTRIBUTE STOCK")
+        title.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {STYLE_NAVY}; border: none;")
+        layout.addWidget(title)
+        
+        # Request info
+        info_frame = QFrame()
+        info_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {STYLE_BG_LIGHT};
+                border: 1px solid {STYLE_BORDER};
+                border-radius: 4px;
+                padding: 12px;
+            }}
+        """)
+        info_layout = QVBoxLayout(info_frame)
+        info_layout.setSpacing(6)
+        
+        req_item = QLabel(f"<b>Item:</b> {self.request['item_name']}")
+        req_item.setStyleSheet("border: none; font-size: 13px;")
+        info_layout.addWidget(req_item)
+        
+        req_qty = QLabel(f"<b>Requested Quantity:</b> {self.request['quantity']} {self.request['unit']}")
+        req_qty.setStyleSheet("border: none; font-size: 13px;")
+        info_layout.addWidget(req_qty)
+        
+        req_dept = QLabel(f"<b>Department:</b> {self.request['department']}")
+        req_dept.setStyleSheet("border: none; font-size: 13px;")
+        info_layout.addWidget(req_dept)
+        
+        req_by = QLabel(f"<b>Requested by:</b> {self.request['requested_by']}")
+        req_by.setStyleSheet("border: none; font-size: 13px;")
+        info_layout.addWidget(req_by)
+        
+        if self.request.get('reason'):
+            req_reason = QLabel(f"<b>Reason:</b> {self.request['reason']}")
+            req_reason.setStyleSheet("border: none; font-size: 13px;")
+            req_reason.setWordWrap(True)
+            info_layout.addWidget(req_reason)
+        
+        layout.addWidget(info_frame)
+        
+        # Form
+        form_layout = QVBoxLayout()
+        form_layout.setSpacing(12)
+        
+        # Quantity to distribute
+        qty_label = QLabel("Quantity to Distribute*")
+        qty_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
+        form_layout.addWidget(qty_label)
+        
+        self.qty_spin = QSpinBox()
+        self.qty_spin.setRange(1, 999999)
+        self.qty_spin.setValue(self.request['quantity'])
+        self.qty_spin.setFixedHeight(40)
+        self.qty_spin.setStyleSheet(f"""
+            QSpinBox {{
+                border: 1px solid {STYLE_BORDER};
+                border-radius: 4px;
+                padding: 0 10px;
+                font-size: 13px;
+            }}
+            QSpinBox:focus {{ border-color: {STYLE_BLUE}; }}
+        """)
+        form_layout.addWidget(self.qty_spin)
+        
+        # Notes
+        notes_label = QLabel("Notes (Optional)")
+        notes_label.setFont(QFont("Arial", 11, QFont.Weight.Bold))
+        form_layout.addWidget(notes_label)
+        
+        self.notes_edit = QTextEdit()
+        self.notes_edit.setFixedHeight(80)
+        self.notes_edit.setPlaceholderText("Add any notes about this distribution...")
+        self.notes_edit.setStyleSheet(f"""
+            QTextEdit {{
+                border: 1px solid {STYLE_BORDER};
+                border-radius: 4px;
+                padding: 10px;
+                font-size: 13px;
+            }}
+            QTextEdit:focus {{ border-color: {STYLE_BLUE}; }}
+        """)
+        form_layout.addWidget(self.notes_edit)
+        
+        layout.addLayout(form_layout)
+        layout.addStretch()
+        
+        # Buttons
+        button_row = QHBoxLayout()
+        button_row.setSpacing(12)
+        button_row.addStretch()
+        
+        self.cancel_btn = QPushButton("CANCEL")
+        self.cancel_btn.setFixedSize(110, 42)
+        self.cancel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.cancel_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: white;
+                border: 2px solid {STYLE_BORDER};
+                color: #6b7280;
+                font-weight: bold;
+                font-size: 11px;
+                border-radius: 4px;
+                letter-spacing: 0.5px;
+            }}
+            QPushButton:hover {{ 
+                border-color: {STYLE_BLUE}; 
+                color: {STYLE_BLUE}; 
+            }}
+        """)
+        self.cancel_btn.clicked.connect(self.reject)
+        button_row.addWidget(self.cancel_btn)
+        
+        self.approve_btn = QPushButton("APPROVE")
+        self.approve_btn.setFixedSize(110, 42)
+        self.approve_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.approve_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #10b981;
+                color: white;
+                border: none;
+                font-weight: bold;
+                font-size: 11px;
+                border-radius: 4px;
+                letter-spacing: 0.5px;
+            }}
+            QPushButton:hover {{ background-color: #059669; }}
+        """)
+        button_row.addWidget(self.approve_btn)
+        
+        layout.addLayout(button_row)
+    
+    def get_data(self):
+        """Return the form data."""
+        return {
+            'quantity': self.qty_spin.value(),
+            'notes': self.notes_edit.toPlainText()
+        }
+
+
 class RequestsPage(QWidget):
     """Department Requests page for submitting and tracking stock requests."""
     

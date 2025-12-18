@@ -75,29 +75,50 @@ class DashboardWindow(QMainWindow):
         
         # Profile container
         profile_container = QFrame()
-        profile_container.setStyleSheet("background-color: transparent; border: none; padding: 10px 20px;")
+        profile_container.setStyleSheet("background-color: transparent; border: none; padding: 10px 15px;")
         profile_lay = QHBoxLayout(profile_container)
-        profile_lay.setSpacing(12)
+        profile_lay.setSpacing(10)
+        profile_lay.setContentsMargins(0, 0, 0, 0)
         
         # Profile icon (circle with initial)
         profile_icon = QLabel("👤")
-        profile_icon.setFixedSize(50, 50)
+        profile_icon.setFixedSize(45, 45)
         profile_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
         profile_icon.setStyleSheet("""
             background-color: #e5e7eb;
-            border-radius: 25px;
-            font-size: 24px;
+            border-radius: 22px;
+            font-size: 22px;
             border: none;
         """)
         profile_lay.addWidget(profile_icon)
         
-        # Name and role
+        # Name and role container with proper sizing
         name_role_container = QVBoxLayout()
         name_role_container.setSpacing(2)
+        name_role_container.setContentsMargins(0, 0, 0, 0)
+        
         self.name_lbl = QLabel("Director Name")
-        self.name_lbl.setStyleSheet("color: #111827; font-size: 14px; font-weight: 700; border:none;")
+        self.name_lbl.setMaximumWidth(165)  # Prevent overflow
+        self.name_lbl.setWordWrap(False)
+        self.name_lbl.setStyleSheet("""
+            color: #111827; 
+            font-size: 13px; 
+            font-weight: 700; 
+            border: none;
+        """)
+        # Enable text eliding
+        self.name_lbl.setTextInteractionFlags(Qt.TextInteractionFlag.NoTextInteraction)
+        
         self.role_lbl = QLabel("Director")
-        self.role_lbl.setStyleSheet("color: #6b7280; font-size: 11px; font-weight: 500; border:none;")
+        self.role_lbl.setMaximumWidth(165)  # Prevent overflow
+        self.role_lbl.setWordWrap(False)
+        self.role_lbl.setStyleSheet("""
+            color: #6b7280; 
+            font-size: 11px; 
+            font-weight: 500; 
+            border: none;
+        """)
+        
         name_role_container.addWidget(self.name_lbl)
         name_role_container.addWidget(self.role_lbl)
         profile_lay.addLayout(name_role_container)
@@ -316,9 +337,9 @@ class DashboardWindow(QMainWindow):
         self.current_role = user_role
         self.current_department = user_department
         
-        # Update profile labels
-        self.name_lbl.setText(user_name)
-        self.role_lbl.setText(user_role)
+        # Update profile labels with text eliding
+        self.set_elided_text(self.name_lbl, user_name, 165)
+        self.set_elided_text(self.role_lbl, user_role, 165)
         
         # Get allowed pages for this role
         allowed_pages = self.ROLE_PAGES.get(user_role, ['DASHBOARD'])
@@ -501,4 +522,26 @@ class DashboardWindow(QMainWindow):
         for name, btn in self.nav_btns.items():
             btn.setObjectName("ActiveNav" if name == title else "")
             btn.style().unpolish(btn)
-            btn.style().polish(btn)
+            btn.style().polish(btn)    
+    def set_elided_text(self, label, text, max_width):
+        """Set text on label with eliding if it's too long."""
+        from PyQt6.QtGui import QFontMetrics
+        from PyQt6.QtCore import Qt
+        
+        # Get font metrics
+        font_metrics = QFontMetrics(label.font())
+        
+        # Elide text if too wide
+        elided_text = font_metrics.elidedText(
+            text, 
+            Qt.TextElideMode.ElideRight, 
+            max_width
+        )
+        
+        # Set the elided text
+        label.setText(elided_text)
+        # Set tooltip with full text if elided
+        if elided_text != text:
+            label.setToolTip(text)
+        else:
+            label.setToolTip("")

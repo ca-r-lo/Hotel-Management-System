@@ -1,10 +1,10 @@
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QFrame,
     QTableWidget, QTableWidgetItem, QHeaderView, QComboBox, QDialog,
-    QLineEdit, QMessageBox, QSpinBox, QMainWindow
+    QLineEdit, QMessageBox, QSpinBox, QMainWindow, QScrollArea
 )
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont, QIcon, QPixmap, QPainter, QColor
+from PyQt6.QtGui import QFont, QIcon, QPixmap, QPainter, QColor, QBrush
 
 # --- Shared Style Constants ---
 STYLE_NAVY = "#111827"
@@ -296,6 +296,565 @@ class AddStockDialog(QDialog):
             'stock_qty': self.stock_spin.value(),
             'min_stock': self.min_spin.value()
         }
+
+
+class StockRequestsDialog(QDialog):
+    """Dialog for viewing and managing stock requests."""
+    
+    def __init__(self, parent=None, controller=None):
+        super().__init__(parent)
+        self.controller = controller
+        self.setWindowTitle("Stock Requests")
+        self.setFixedSize(950, 650)
+        self.init_ui()
+    
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        self.setStyleSheet(f"""
+            QDialog {{ 
+                background-color: {STYLE_BG_LIGHT}; 
+            }}
+        """)
+        
+        # Header with gradient background
+        header_frame = QFrame()
+        header_frame.setFixedHeight(80)
+        header_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {STYLE_NAVY};
+                border: none;
+            }}
+        """)
+        header_layout = QHBoxLayout(header_frame)
+        header_layout.setContentsMargins(30, 0, 30, 0)
+        
+        title = QLabel("Pending Stock Requests")
+        title.setFont(QFont("Arial", 20, QFont.Weight.Bold))
+        title.setStyleSheet("color: white; border: none;")
+        header_layout.addWidget(title)
+        
+        header_layout.addStretch()
+        
+        # Refresh button
+        self.refresh_btn = QPushButton("↻ Refresh")
+        self.refresh_btn.setFixedSize(100, 36)
+        self.refresh_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.refresh_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: rgba(255, 255, 255, 0.15);
+                color: white;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: 12px;
+            }}
+            QPushButton:hover {{ 
+                background-color: rgba(255, 255, 255, 0.25);
+                border-color: rgba(255, 255, 255, 0.5);
+            }}
+        """)
+        header_layout.addWidget(self.refresh_btn)
+        
+        layout.addWidget(header_frame)
+        
+        # Content area with padding
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setContentsMargins(24, 24, 24, 24)
+        content_layout.setSpacing(16)
+        
+        # Scroll area for requests
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet(f"""
+            QScrollArea {{
+                border: none;
+                background-color: transparent;
+            }}
+            QScrollBar:vertical {{
+                border: none;
+                background-color: #f3f4f6;
+                width: 10px;
+                border-radius: 5px;
+            }}
+            QScrollBar::handle:vertical {{
+                background-color: #d1d5db;
+                border-radius: 5px;
+                min-height: 20px;
+            }}
+            QScrollBar::handle:vertical:hover {{
+                background-color: #9ca3af;
+            }}
+            QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+                border: none;
+                background: none;
+            }}
+        """)
+        
+        # Container for request cards
+        self.requests_container = QWidget()
+        self.requests_layout = QVBoxLayout(self.requests_container)
+        self.requests_layout.setSpacing(12)
+        self.requests_layout.setContentsMargins(0, 0, 0, 0)
+        self.requests_layout.addStretch()
+        
+        scroll.setWidget(self.requests_container)
+        content_layout.addWidget(scroll)
+        
+        layout.addWidget(content_widget)
+        
+        # Footer with close button
+        footer_layout = QHBoxLayout()
+        footer_layout.setContentsMargins(24, 0, 24, 24)
+        footer_layout.addStretch()
+        
+        self.close_btn = QPushButton("Close")
+        self.close_btn.setFixedSize(100, 40)
+        self.close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: white;
+                border: 1px solid {STYLE_BORDER};
+                color: #6b7280;
+                font-weight: 600;
+                font-size: 13px;
+                border-radius: 6px;
+            }}
+            QPushButton:hover {{ 
+                background-color: {STYLE_BG_LIGHT};
+                border-color: {STYLE_NAVY};
+                color: {STYLE_NAVY};
+            }}
+        """)
+        self.close_btn.clicked.connect(self.accept)
+        footer_layout.addWidget(self.close_btn)
+        
+        layout.addLayout(footer_layout)
+    
+    def load_requests(self, requests):
+        """Load and display requests."""
+        # Clear existing widgets
+        while self.requests_layout.count() > 1:  # Keep the stretch
+            item = self.requests_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        
+        if not requests:
+            # Show empty state with icon
+            empty_widget = QWidget()
+            empty_layout = QVBoxLayout(empty_widget)
+            empty_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            empty_layout.setSpacing(12)
+            
+            empty_icon = QLabel("📭")
+            empty_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            empty_icon.setStyleSheet("font-size: 48px; border: none;")
+            empty_layout.addWidget(empty_icon)
+            
+            empty_label = QLabel("No Pending Requests")
+            empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            empty_label.setStyleSheet("color: #9ca3af; font-size: 16px; font-weight: 600; border: none;")
+            empty_layout.addWidget(empty_label)
+            
+            empty_sublabel = QLabel("All requests have been processed")
+            empty_sublabel.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            empty_sublabel.setStyleSheet("color: #d1d5db; font-size: 13px; border: none;")
+            empty_layout.addWidget(empty_sublabel)
+            
+            self.requests_layout.insertWidget(0, empty_widget)
+        else:
+            # Add request cards
+            for request in requests:
+                card = self.create_request_card(request)
+                self.requests_layout.insertWidget(self.requests_layout.count() - 1, card)
+    
+    def create_request_card(self, request):
+        """Create a card widget for a request."""
+        card = QFrame()
+        card.setStyleSheet(f"""
+            QFrame {{
+                background-color: white;
+                border: 1px solid {STYLE_BORDER};
+                border-radius: 8px;
+            }}
+            QFrame:hover {{
+                border-color: {STYLE_BLUE};
+            }}
+        """)
+        card.setMinimumHeight(110)
+        card.setMaximumHeight(110)
+        
+        card_layout = QHBoxLayout(card)
+        card_layout.setContentsMargins(20, 16, 20, 16)
+        card_layout.setSpacing(20)
+        
+        # Left side - Item info with colored indicator
+        left_layout = QHBoxLayout()
+        left_layout.setSpacing(16)
+        
+        # Colored indicator bar
+        indicator = QFrame()
+        indicator.setFixedSize(4, 78)
+        indicator.setStyleSheet(f"""
+            QFrame {{
+                background-color: {STYLE_BLUE};
+                border-radius: 2px;
+                border: none;
+            }}
+        """)
+        left_layout.addWidget(indicator)
+        
+        # Request info
+        info_layout = QVBoxLayout()
+        info_layout.setSpacing(6)
+        
+        # Item name and quantity - larger and bolder
+        item_label = QLabel(f"{request['item_name']}")
+        item_label.setFont(QFont("Arial", 15, QFont.Weight.Bold))
+        item_label.setStyleSheet(f"color: {STYLE_NAVY}; border: none;")
+        info_layout.addWidget(item_label)
+        
+        # Quantity with badge style
+        qty_label = QLabel(f"Quantity: {request['quantity']} {request['unit']}")
+        qty_label.setStyleSheet(f"""
+            color: {STYLE_BLUE}; 
+            font-size: 13px; 
+            font-weight: 600;
+            border: none;
+        """)
+        info_layout.addWidget(qty_label)
+        
+        # Department and requester - cleaner icons
+        details_label = QLabel(f"🏢 {request['department']}  •  👤 {request['requested_by']}")
+        details_label.setStyleSheet("color: #6b7280; font-size: 12px; border: none;")
+        info_layout.addWidget(details_label)
+        
+        # Date - smaller and subtle
+        created_at = request['created_at'].strftime("%b %d, %Y at %I:%M %p") if hasattr(request['created_at'], 'strftime') else str(request['created_at'])
+        date_label = QLabel(f"� {created_at}")
+        date_label.setStyleSheet("color: #d1d5db; font-size: 11px; border: none;")
+        info_layout.addWidget(date_label)
+        
+        left_layout.addLayout(info_layout)
+        card_layout.addLayout(left_layout)
+        
+        # Right side - Reason (if provided) and Actions
+        right_layout = QVBoxLayout()
+        right_layout.setSpacing(10)
+        
+        # Reason in a subtle box
+        if request.get('reason'):
+            reason_frame = QFrame()
+            reason_frame.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {STYLE_BG_LIGHT};
+                    border: 1px solid {STYLE_BORDER};
+                    border-radius: 6px;
+                    padding: 8px;
+                }}
+            """)
+            reason_layout = QVBoxLayout(reason_frame)
+            reason_layout.setContentsMargins(8, 8, 8, 8)
+            reason_layout.setSpacing(4)
+            
+            reason_title = QLabel("Reason:")
+            reason_title.setStyleSheet("color: #9ca3af; font-size: 10px; font-weight: 600; border: none;")
+            reason_layout.addWidget(reason_title)
+            
+            reason_text = QLabel(request['reason'])
+            reason_text.setStyleSheet("color: #6b7280; font-size: 11px; border: none;")
+            reason_text.setWordWrap(True)
+            reason_text.setMaximumWidth(250)
+            reason_layout.addWidget(reason_text)
+            
+            right_layout.addWidget(reason_frame)
+        
+        right_layout.addStretch()
+        
+        # Action buttons container
+        actions_layout = QHBoxLayout()
+        actions_layout.setSpacing(8)
+        
+        # Approve button - modern green
+        approve_btn = QPushButton("✓ Approve")
+        approve_btn.setFixedSize(95, 38)
+        approve_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        approve_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #10b981;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{ 
+                background-color: #059669;
+            }}
+            QPushButton:pressed {{
+                background-color: #047857;
+            }}
+        """)
+        approve_btn.clicked.connect(lambda: self.controller.handle_approve_from_dialog(request, self))
+        actions_layout.addWidget(approve_btn)
+        
+        # Reject button - modern red
+        reject_btn = QPushButton("✗ Reject")
+        reject_btn.setFixedSize(85, 38)
+        reject_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        reject_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #ef4444;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                font-size: 12px;
+                font-weight: 600;
+            }}
+            QPushButton:hover {{ 
+                background-color: #dc2626;
+            }}
+            QPushButton:pressed {{
+                background-color: #b91c1c;
+            }}
+        """)
+        reject_btn.clicked.connect(lambda: self.controller.handle_reject_from_dialog(request['id'], self))
+        actions_layout.addWidget(reject_btn)
+        
+        right_layout.addLayout(actions_layout)
+        card_layout.addLayout(right_layout)
+        
+        return card
+
+
+class StockHistoryDialog(QDialog):
+    """Dialog for viewing stock movement history."""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Stock History")
+        self.setFixedSize(1000, 650)
+        self.init_ui()
+    
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+        
+        self.setStyleSheet(f"""
+            QDialog {{ 
+                background-color: {STYLE_BG_LIGHT}; 
+            }}
+        """)
+        
+        # Header
+        header_frame = QFrame()
+        header_frame.setFixedHeight(80)
+        header_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {STYLE_NAVY};
+                border: none;
+            }}
+        """)
+        header_layout = QHBoxLayout(header_frame)
+        header_layout.setContentsMargins(30, 0, 30, 0)
+        
+        title = QLabel("Stock Movement History")
+        title.setFont(QFont("Arial", 20, QFont.Weight.Bold))
+        title.setStyleSheet("color: white; border: none;")
+        header_layout.addWidget(title)
+        
+        header_layout.addStretch()
+        
+        # Filter dropdown
+        self.filter_combo = QComboBox()
+        self.filter_combo.addItems(["All Movements", "Stock In", "Stock Out", "Adjustments"])
+        self.filter_combo.setFixedSize(150, 36)
+        self.filter_combo.setStyleSheet(f"""
+            QComboBox {{
+                background-color: rgba(255, 255, 255, 0.15);
+                color: white;
+                border: 1px solid rgba(255, 255, 255, 0.3);
+                border-radius: 6px;
+                padding: 6px 12px;
+                font-weight: 600;
+                font-size: 12px;
+            }}
+            QComboBox::drop-down {{
+                border: none;
+            }}
+            QComboBox::down-arrow {{
+                image: none;
+                border: none;
+            }}
+            QComboBox QAbstractItemView {{
+                background-color: white;
+                color: #111827;
+                selection-background-color: {STYLE_BLUE};
+                border: 1px solid {STYLE_BORDER};
+            }}
+        """)
+        header_layout.addWidget(self.filter_combo)
+        
+        layout.addWidget(header_frame)
+        
+        # Content area
+        content_widget = QWidget()
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setContentsMargins(24, 24, 24, 24)
+        content_layout.setSpacing(16)
+        
+        # Table for history
+        self.history_table = QTableWidget()
+        self.history_table.setColumnCount(6)
+        self.history_table.setHorizontalHeaderLabels(["Date & Time", "Item", "Type", "Quantity", "By User", "Notes"])
+        self.history_table.horizontalHeader().setStretchLastSection(True)
+        self.history_table.setColumnWidth(0, 180)
+        self.history_table.setColumnWidth(1, 200)
+        self.history_table.setColumnWidth(2, 120)
+        self.history_table.setColumnWidth(3, 100)
+        self.history_table.setColumnWidth(4, 150)
+        self.history_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.history_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.history_table.setAlternatingRowColors(True)
+        
+        self.history_table.setStyleSheet(f"""
+            QTableWidget {{
+                background-color: white;
+                border: 1px solid {STYLE_BORDER};
+                border-radius: 8px;
+                gridline-color: {STYLE_BORDER};
+                color: #111827;
+            }}
+            QTableWidget::item {{
+                padding: 10px 8px;
+                border: none;
+                color: #111827;
+            }}
+            QTableWidget::item:selected {{
+                background-color: {STYLE_BLUE};
+                color: white;
+            }}
+            QHeaderView::section {{
+                background-color: {STYLE_BG_LIGHT};
+                color: {STYLE_NAVY};
+                padding: 12px 8px;
+                border: none;
+                border-bottom: 2px solid {STYLE_BORDER};
+                font-weight: 700;
+                font-size: 12px;
+                text-align: left;
+            }}
+            QTableWidget::item:alternate {{
+                background-color: #fafafa;
+            }}
+        """)
+        
+        content_layout.addWidget(self.history_table)
+        
+        layout.addWidget(content_widget)
+        
+        # Footer
+        footer_layout = QHBoxLayout()
+        footer_layout.setContentsMargins(24, 0, 24, 24)
+        
+        # Export button
+        export_btn = QPushButton("📥 Export")
+        export_btn.setFixedSize(100, 40)
+        export_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        export_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {STYLE_BLUE};
+                color: white;
+                border: none;
+                border-radius: 6px;
+                font-weight: 600;
+                font-size: 13px;
+            }}
+            QPushButton:hover {{
+                background-color: #003d82;
+            }}
+        """)
+        footer_layout.addWidget(export_btn)
+        
+        footer_layout.addStretch()
+        
+        # Close button
+        close_btn = QPushButton("Close")
+        close_btn.setFixedSize(100, 40)
+        close_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        close_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: white;
+                border: 1px solid {STYLE_BORDER};
+                color: #6b7280;
+                font-weight: 600;
+                font-size: 13px;
+                border-radius: 6px;
+            }}
+            QPushButton:hover {{
+                background-color: {STYLE_BG_LIGHT};
+                border-color: {STYLE_NAVY};
+                color: {STYLE_NAVY};
+            }}
+        """)
+        close_btn.clicked.connect(self.accept)
+        footer_layout.addWidget(close_btn)
+        
+        layout.addLayout(footer_layout)
+    
+    def load_history(self, history_data):
+        """Load history data into the table."""
+        self.history_table.setRowCount(len(history_data))
+        
+        for row_idx, record in enumerate(history_data):
+            # Set row height for better readability
+            self.history_table.setRowHeight(row_idx, 45)
+            
+            # Date & Time
+            date_item = QTableWidgetItem(record.get('timestamp', ''))
+            date_item.setForeground(QBrush(QColor("#111827")))
+            self.history_table.setItem(row_idx, 0, date_item)
+            
+            # Item
+            item_item = QTableWidgetItem(record.get('item_name', ''))
+            item_item.setForeground(QBrush(QColor("#111827")))
+            item_item.setFont(QFont("Arial", 11, QFont.Weight.Bold))
+            self.history_table.setItem(row_idx, 1, item_item)
+            
+            # Type (with color coding and badge style)
+            type_text = record.get('type', 'Unknown')
+            type_item = QTableWidgetItem(type_text)
+            type_item.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+            if type_text == "Stock In":
+                type_item.setForeground(QBrush(QColor("#10b981")))
+            elif type_text == "Stock Out":
+                type_item.setForeground(QBrush(QColor("#ef4444")))
+            else:
+                type_item.setForeground(QBrush(QColor("#f59e0b")))
+            self.history_table.setItem(row_idx, 2, type_item)
+            
+            # Quantity
+            qty_item = QTableWidgetItem(str(record.get('quantity', 0)))
+            qty_item.setForeground(QBrush(QColor("#111827")))
+            qty_item.setFont(QFont("Arial", 11))
+            self.history_table.setItem(row_idx, 3, qty_item)
+            
+            # By User
+            user_item = QTableWidgetItem(record.get('user', 'System'))
+            user_item.setForeground(QBrush(QColor("#6b7280")))
+            self.history_table.setItem(row_idx, 4, user_item)
+            
+            # Notes
+            notes_item = QTableWidgetItem(record.get('notes', '-'))
+            notes_item.setForeground(QBrush(QColor("#6b7280")))
+            self.history_table.setItem(row_idx, 5, notes_item)
+            # Notes
+            notes_item = QTableWidgetItem(record.get('notes', '-'))
+            self.history_table.setItem(row_idx, 5, notes_item)
 
 
 class InventoryPage(QWidget):

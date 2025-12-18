@@ -178,3 +178,52 @@ class RequestModel:
         except Exception as e:
             conn.close()
             raise e
+    
+    @staticmethod
+    def approve_request(request_id, distributed_qty, notes=None):
+        """Approve a request and update to Approved status."""
+        conn = get_conn()
+        cur = conn.cursor()
+        
+        try:
+            # Update request status
+            note_text = f"Approved. Distributed: {distributed_qty}"
+            if notes:
+                note_text += f". {notes}"
+            
+            cur.execute(f"""
+                UPDATE requests
+                SET status = 'Approved', notes = {_paramstyle()}
+                WHERE id = {_paramstyle()}
+            """, (note_text, request_id))
+            
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            conn.close()
+            raise e
+    
+    @staticmethod
+    def reject_request(request_id, reason=None):
+        """Reject a request and update to Rejected status."""
+        conn = get_conn()
+        cur = conn.cursor()
+        
+        try:
+            note_text = "Rejected"
+            if reason:
+                note_text += f". Reason: {reason}"
+            
+            cur.execute(f"""
+                UPDATE requests
+                SET status = 'Rejected', notes = {_paramstyle()}
+                WHERE id = {_paramstyle()}
+            """, (note_text, request_id))
+            
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            conn.close()
+            raise e

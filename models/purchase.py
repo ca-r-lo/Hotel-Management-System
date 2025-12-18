@@ -345,6 +345,26 @@ class ItemModel:
             return False
         finally:
             conn.close()
+    
+    @staticmethod
+    def delete_item(item_id: int):
+        """Delete an inventory item."""
+        conn = get_conn()
+        try:
+            param = _paramstyle()
+            sql = f"DELETE FROM items WHERE id = {param}"
+            _exec(conn, sql, (item_id,))
+            conn.commit()
+            return True
+        except Exception as e:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+            print(f"[DELETE_ITEM ERROR] {repr(e)}")
+            return False
+        finally:
+            conn.close()
 
 
 class PurchaseModel:

@@ -5,6 +5,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from views.requests import SendRequestDialog
 from models.request import RequestModel
+from models.purchase import ItemModel
 
 STYLE_NAVY = "#111827"
 STYLE_BLUE = "#0056b3"
@@ -31,6 +32,16 @@ class RequestsController:
         self.view.current_user = user_name
         self.view.current_role = user_role
         self.view.current_department = department
+        
+        # Store role for conditional logic
+        self.user_role = user_role
+        self.user_department = department
+        
+        # Hide Send Request button for Purchase Admin/Owner
+        if user_role in ["Purchase Admin", "Owner"]:
+            self.view.btn_send_request.hide()
+        else:
+            self.view.btn_send_request.show()
         
         # Load requests
         self.refresh_requests()
@@ -279,25 +290,69 @@ class RequestsController:
         card_layout.addLayout(info_layout)
         card_layout.addStretch()
         
-        # Delete button (trash icon)
-        delete_btn = QPushButton("🗑")
-        delete_btn.setFixedSize(42, 42)
-        delete_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        delete_btn.setToolTip("Delete request")
-        delete_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: #ef4444;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                font-size: 18px;
-            }}
-            QPushButton:hover {{ 
-                background-color: #dc2626;
-            }}
-        """)
-        delete_btn.clicked.connect(lambda: self.handle_delete_request(request['id']))
-        card_layout.addWidget(delete_btn)
+        # Show different buttons based on role and status
+        if self.user_role in ["Purchase Admin", "Owner"] and request['status'] == 'Pending':
+            # Approve button for Purchase Admin/Owner
+            approve_btn = QPushButton("✓ APPROVE")
+            approve_btn.setFixedSize(100, 42)
+            approve_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            approve_btn.setToolTip("Approve and distribute stock")
+            approve_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: #10b981;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 12px;
+                    font-weight: bold;
+                }}
+                QPushButton:hover {{ 
+                    background-color: #059669;
+                }}
+            """)
+            approve_btn.clicked.connect(lambda: self.handle_approve_request(request))
+            card_layout.addWidget(approve_btn)
+            
+            # Reject button
+            reject_btn = QPushButton("✗ REJECT")
+            reject_btn.setFixedSize(90, 42)
+            reject_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            reject_btn.setToolTip("Reject request")
+            reject_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: #ef4444;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 12px;
+                    font-weight: bold;
+                }}
+                QPushButton:hover {{ 
+                    background-color: #dc2626;
+                }}
+            """)
+            reject_btn.clicked.connect(lambda: self.handle_reject_request(request['id']))
+            card_layout.addWidget(reject_btn)
+        else:
+            # Delete button (trash icon) - for department users or completed requests
+            delete_btn = QPushButton("🗑")
+            delete_btn.setFixedSize(42, 42)
+            delete_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            delete_btn.setToolTip("Delete request")
+            delete_btn.setStyleSheet(f"""
+                QPushButton {{
+                    background-color: #ef4444;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 18px;
+                }}
+                QPushButton:hover {{ 
+                    background-color: #dc2626;
+                }}
+            """)
+            delete_btn.clicked.connect(lambda: self.handle_delete_request(request['id']))
+            card_layout.addWidget(delete_btn)
         
         return card
     
@@ -368,8 +423,184 @@ class RequestsController:
                 """)
                 error_msg.exec()
     
+    def handle_approve_request(self, request):
+        """Handle approving a request."""
+        from views.requests import DistributeStockDialog
+        
+        # Show distribute dialog
+        dialog = DistributeStockDialog(self.view, request=request)
+        dialog.approve_btn.clicked.connect(lambda: self.process_approval(dialog, request))
+        dialog.exec()
+    
+    def process_approval(self, dialog, request):
+        """Process the approval and deduct stock."""
+        data = dialog.get_data()
+        distributed_qty = data['quantity']
+        notes = data['notes']
+        
+        # Check if item exists in inventory
+        try:
+            items = ItemModel.list_items()
+            matching_item = None
+            for item in items:
+                if item['name'].lower() == request['item_name'].lower():
+                    matching_item = item
+                    break
+            
+            if not matching_item:
+                error_msg = QMessageBox(dialog)
+                error_msg.setIcon(QMessageBox.Icon.Warning)
+                error_msg.setWindowTitle("Item Not Found")
+                error_msg.setText(f"Item '{request['item_name']}' not found in inventory. Cannot distribute stock.")
+                error_msg.setStyleSheet("""
+                    QMessageBox { background-color: white; }
+                    QLabel { color: #111827; font-size: 13px; }
+                    QPushButton { 
+                        background-color: #ef4444; 
+                        color: white; 
+                        border: none; 
+                        padding: 8px 20px; 
+                        border-radius: 4px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover { background-color: #dc2626; }
+                """)
+                error_msg.exec()
+                return
+            
+            # Check if enough stock
+            current_stock = matching_item.get('stock_qty', 0)
+            if current_stock < distributed_qty:
+                error_msg = QMessageBox(dialog)
+                error_msg.setIcon(QMessageBox.Icon.Warning)
+                error_msg.setWindowTitle("Insufficient Stock")
+                error_msg.setText(f"Insufficient stock. Available: {current_stock} {matching_item['unit']}, Requested: {distributed_qty} {request['unit']}")
+                error_msg.setStyleSheet("""
+                    QMessageBox { background-color: white; }
+                    QLabel { color: #111827; font-size: 13px; }
+                    QPushButton { 
+                        background-color: #ef4444; 
+                        color: white; 
+                        border: none; 
+                        padding: 8px 20px; 
+                        border-radius: 4px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover { background-color: #dc2626; }
+                """)
+                error_msg.exec()
+                return
+            
+            # Deduct stock
+            ItemModel.adjust_stock(matching_item['id'], -distributed_qty)
+            
+            # Update request status
+            RequestModel.approve_request(request['id'], distributed_qty, notes)
+            
+            # Close dialog
+            dialog.accept()
+            
+            # Show success message
+            success_msg = QMessageBox(self.view)
+            success_msg.setIcon(QMessageBox.Icon.Information)
+            success_msg.setWindowTitle("Success")
+            success_msg.setText(f"Request approved! {distributed_qty} {request['unit']} distributed to {request['department']}.")
+            success_msg.setStyleSheet("""
+                QMessageBox { background-color: white; }
+                QLabel { color: #111827; font-size: 13px; }
+                QPushButton { 
+                    background-color: #10b981; 
+                    color: white; 
+                    border: none; 
+                    padding: 8px 20px; 
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #059669; }
+            """)
+            success_msg.exec()
+            
+            # Refresh requests
+            self.refresh_requests()
+            
+        except Exception as e:
+            error_msg = QMessageBox(dialog)
+            error_msg.setIcon(QMessageBox.Icon.Critical)
+            error_msg.setWindowTitle("Error")
+            error_msg.setText(f"Failed to approve request:\n{e}")
+            error_msg.setStyleSheet("""
+                QMessageBox { background-color: white; }
+                QLabel { color: #111827; font-size: 13px; }
+                QPushButton { 
+                    background-color: #ef4444; 
+                    color: white; 
+                    border: none; 
+                    padding: 8px 20px; 
+                    border-radius: 4px;
+                    font-weight: bold;
+                }
+                QPushButton:hover { background-color: #dc2626; }
+            """)
+            error_msg.exec()
+    
+    def handle_reject_request(self, request_id):
+        """Handle rejecting a request."""
+        from PyQt6.QtWidgets import QInputDialog
+        
+        # Ask for rejection reason
+        reason, ok = QInputDialog.getText(
+            self.view,
+            "Reject Request",
+            "Reason for rejection (optional):",
+        )
+        
+        if ok:
+            try:
+                RequestModel.reject_request(request_id, reason if reason else None)
+                
+                success_msg = QMessageBox(self.view)
+                success_msg.setIcon(QMessageBox.Icon.Information)
+                success_msg.setWindowTitle("Success")
+                success_msg.setText("Request rejected successfully!")
+                success_msg.setStyleSheet("""
+                    QMessageBox { background-color: white; }
+                    QLabel { color: #111827; font-size: 13px; }
+                    QPushButton { 
+                        background-color: #10b981; 
+                        color: white; 
+                        border: none; 
+                        padding: 8px 20px; 
+                        border-radius: 4px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover { background-color: #059669; }
+                """)
+                success_msg.exec()
+                
+                self.refresh_requests()
+            except Exception as e:
+                error_msg = QMessageBox(self.view)
+                error_msg.setIcon(QMessageBox.Icon.Critical)
+                error_msg.setWindowTitle("Error")
+                error_msg.setText(f"Failed to reject request:\n{e}")
+                error_msg.setStyleSheet("""
+                    QMessageBox { background-color: white; }
+                    QLabel { color: #111827; font-size: 13px; }
+                    QPushButton { 
+                        background-color: #ef4444; 
+                        color: white; 
+                        border: none; 
+                        padding: 8px 20px; 
+                        border-radius: 4px;
+                        font-weight: bold;
+                    }
+                    QPushButton:hover { background-color: #dc2626; }
+                """)
+                error_msg.exec()
+    
     def refresh(self):
         """Placeholder refresh method for compatibility."""
         if hasattr(self, 'refresh_requests'):
             self.refresh_requests()
+
 
