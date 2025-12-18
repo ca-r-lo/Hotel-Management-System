@@ -9,6 +9,7 @@ class PurchaseController:
         self.dashboard = dashboard  # Reference to dashboard for current_user
         # Connect main dashboard button to open procurement
         self.view.btn_order_stocks.clicked.connect(self.handle_open_order_stocks)
+        self.view.btn_suppliers.clicked.connect(self.handle_open_suppliers)
         self.refresh_table()
 
     def handle_open_order_stocks(self):
@@ -19,6 +20,14 @@ class PurchaseController:
         # Connect the 'CONFIRM' button
         dlg.save_btn.clicked.connect(lambda: self.handle_save_procurement(dlg))
         dlg.exec()
+
+    def handle_open_suppliers(self):
+        """Opens the Suppliers Management Dialog using SuppliersController."""
+        from controllers.suppliers_controller import SuppliersController
+        controller = SuppliersController(self.view, self.model)
+        controller.open_suppliers_management()
+        # Refresh history after closing in case suppliers were modified
+        self.refresh_table()
 
     def handle_open_add_item(self, parent_dlg):
         """Opens the Add Item modal and handles data return."""
