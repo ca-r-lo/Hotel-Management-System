@@ -32,14 +32,9 @@ class LoginController:
             except Exception as e:
                 print(f"Error initializing database tables: {e}")
 
-            # Switch Windows and set current user
+            # Switch Windows and update UI based on role
             self.view.hide()
-            self.dashboard_view.current_user = full_name  # Store logged-in user
+            self.dashboard_view.update_ui_for_role(full_name, role)
             self.dashboard_view.show()
-            try:
-                self.dashboard_view.name_lbl.setText(full_name)
-                self.dashboard_view.role_lbl.setText(role)
-            except Exception:
-                pass
         else:
             QMessageBox.critical(self.view, "Login Failed", "Invalid email or password.")

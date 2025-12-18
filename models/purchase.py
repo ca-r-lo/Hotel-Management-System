@@ -80,9 +80,15 @@ def create_tables():
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS messages (
                     id INT PRIMARY KEY AUTO_INCREMENT,
+                    sender_id INT NOT NULL,
+                    recipient_id INT NOT NULL,
+                    category VARCHAR(64) DEFAULT 'General',
                     title VARCHAR(255),
                     body TEXT,
-                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                    is_read BOOLEAN DEFAULT FALSE,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (sender_id) REFERENCES users(id),
+                    FOREIGN KEY (recipient_id) REFERENCES users(id)
                 ) ENGINE=InnoDB;
             """)
             conn.commit()
@@ -138,9 +144,15 @@ def create_tables():
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS messages (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    sender_id INTEGER NOT NULL,
+                    recipient_id INTEGER NOT NULL,
+                    category TEXT DEFAULT 'General',
                     title TEXT,
                     body TEXT,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                    is_read INTEGER DEFAULT 0,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (sender_id) REFERENCES users(id),
+                    FOREIGN KEY (recipient_id) REFERENCES users(id)
                 );
             """)
             conn.commit()
@@ -535,19 +547,21 @@ class MessageModel:
 
     @staticmethod
     def list_messages(user_id: int, limit: int = 50):
-        """List messages for a specific user (received messages)."""
+        """List messages for a specific user (both sent and received)."""
         conn = get_conn()
         try:
             cur = conn.cursor()
-            # Get messages where user is the recipient, with sender information
+            # Get messages where user is either sender or recipient
             cur.execute("""
                 SELECT m.id, m.sender_id, m.recipient_id, m.category, m.title, m.body, m.is_read, m.created_at,
-                       u.full_name as sender_name, u.role as sender_role
+                       sender.full_name as sender_name, sender.role as sender_role,
+                       recipient.full_name as recipient_name, recipient.role as recipient_role
                 FROM messages m
-                LEFT JOIN users u ON m.sender_id = u.id
-                WHERE m.recipient_id = {}
+                LEFT JOIN users sender ON m.sender_id = sender.id
+                LEFT JOIN users recipient ON m.recipient_id = recipient.id
+                WHERE m.recipient_id = {} OR m.sender_id = {}
                 ORDER BY m.created_at DESC LIMIT {}
-            """.format(_paramstyle(), limit), (user_id,))
+            """.format(_paramstyle(), _paramstyle(), limit), (user_id, user_id))
             rows = cur.fetchall()
             result = []
             for r in rows:
@@ -564,7 +578,9 @@ class MessageModel:
                         'is_read': r[6],
                         'created_at': r[7],
                         'sender_name': r[8],
-                        'sender_role': r[9]
+                        'sender_role': r[9],
+                        'recipient_name': r[10],
+                        'recipient_role': r[11]
                     })
             return result
         finally:

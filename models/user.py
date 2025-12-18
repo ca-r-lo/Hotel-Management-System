@@ -13,9 +13,7 @@ class UserModel:
             # Simple query for demonstration. 
             # Note: Use password hashing (like bcrypt) for real applications.
             query = "SELECT full_name, role FROM users WHERE email = ? AND password = ?"
-            # cur.execute(query, (email, password))
-
-            cur.execute(query, ("admin@stash.com", "admin123"))
+            cur.execute(query, (email, password))
             
             user = cur.fetchone()
             return user  # Returns (name, role) if found, else None

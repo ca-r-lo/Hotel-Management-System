@@ -35,6 +35,14 @@ def main():
 
     controller = LoginController(login_view, user_model, dashboard_view)
     
+    # Set logout callback to show login window again
+    def on_logout():
+        login_view.email_input.clear()
+        login_view.pass_input.clear()
+        login_view.show()
+    
+    dashboard_view.on_logout = on_logout
+    
     login_view.show()
     
     sys.exit(app.exec())

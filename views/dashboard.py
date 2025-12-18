@@ -13,11 +13,19 @@ from controllers.messages_controller import MessagesController
 from models import purchase as purchase_model
 
 class DashboardWindow(QMainWindow):
+    # Define role-based access control
+    ROLE_PAGES = {
+        'Purchase Admin': ['DASHBOARD', 'PURCHASE', 'INVENTORY', 'REPORTS', 'MESSAGES'],
+        'Owner': ['DASHBOARD', 'REPORTS', 'MESSAGES'],
+        'Department': ['DASHBOARD', 'PURCHASE', 'INVENTORY', 'MESSAGES']
+    }
+    
     def __init__(self):
         super().__init__()
         self.setWindowTitle("STASH - Hotel Management System")
         self.setMinimumSize(1200, 800)
         self.current_user = None  # Store logged-in user name
+        self.current_role = None  # Store logged-in user role
         self.init_ui()
 
     def init_ui(self):
@@ -56,13 +64,35 @@ class DashboardWindow(QMainWindow):
         sidebar_layout.addWidget(profile_container)
 
         self.nav_btns = {}
-        for text in ["DASHBOARD", "PURCHASE", "INVENTORY", "REPORTS", "MESSAGES"]:
+        nav_pages = ["DASHBOARD", "PURCHASE", "INVENTORY", "REPORTS", "MESSAGES"]
+        for text in nav_pages:
             btn = QPushButton(text)
             if text == "DASHBOARD": btn.setObjectName("ActiveNav")
             sidebar_layout.addWidget(btn)
             self.nav_btns[text] = btn
 
         sidebar_layout.addStretch()
+        
+        # Logout Button
+        self.logout_btn = QPushButton("LOGOUT")
+        self.logout_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #dc2626;
+                color: white;
+                padding: 12px 20px;
+                text-align: center;
+                font-size: 12px;
+                font-weight: 700;
+                border-radius: 4px;
+                margin: 10px;
+                border: none;
+            }
+            QPushButton:hover {
+                background-color: #b91c1c;
+            }
+        """)
+        sidebar_layout.addWidget(self.logout_btn)
+        
         self.main_layout.addWidget(self.sidebar)
 
         # 3. CONTENT AREA Setup
@@ -154,10 +184,61 @@ class DashboardWindow(QMainWindow):
         self.nav_btns["INVENTORY"].clicked.connect(lambda: self.switch_page(2, "INVENTORY"))
         self.nav_btns["REPORTS"].clicked.connect(lambda: self.switch_page(3, "REPORTS"))
         self.nav_btns["MESSAGES"].clicked.connect(lambda: self.switch_page(4, "MESSAGES"))
+        
+        # Connect Logout
+        self.logout_btn.clicked.connect(self.handle_logout)
+
+    def update_ui_for_role(self, user_name, user_role):
+        """Update UI based on user role - show/hide navigation buttons."""
+        self.current_user = user_name
+        self.current_role = user_role
+        
+        # Update profile labels
+        self.name_lbl.setText(user_name)
+        self.role_lbl.setText(user_role)
+        
+        # Get allowed pages for this role
+        allowed_pages = self.ROLE_PAGES.get(user_role, ['DASHBOARD'])
+        
+        # Show/hide navigation buttons based on role
+        for page_name, btn in self.nav_btns.items():
+            if page_name in allowed_pages:
+                btn.setVisible(True)
+            else:
+                btn.setVisible(False)
+        
+        # Switch to dashboard on login
+        self.switch_page(0, "DASHBOARD")
+    
+    def handle_logout(self):
+        """Handle logout - clear session and return to login."""
+        from PyQt6.QtWidgets import QMessageBox
+        
+        reply = QMessageBox.question(
+            self,
+            "Confirm Logout",
+            "Are you sure you want to logout?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            self.current_user = None
+            self.current_role = None
+            # Signal to show login window
+            if hasattr(self, 'on_logout'):
+                self.on_logout()
+            self.close()
 
     def switch_page(self, index, title):
         self.main_stack.setCurrentIndex(index)
         self.title_label.setText(title)
+        
+        # Refresh messages when switching to messages page
+        if title == "MESSAGES" and self.current_user:
+            # Update the current user ID and refresh messages
+            self.messages_ctrl.current_user_id = self.messages_ctrl.get_current_user_id()
+            self.messages_ctrl.refresh_messages()
         
         # Update sidebar styling
         for name, btn in self.nav_btns.items():

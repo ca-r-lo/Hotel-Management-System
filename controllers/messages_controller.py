@@ -20,14 +20,11 @@ class MessagesController:
         
         # Connect action buttons
         self.view.btn_compose.clicked.connect(self.handle_compose)
-        self.view.btn_sort.clicked.connect(self.handle_sort)
-        self.view.btn_archive.clicked.connect(self.handle_archive)
         
         # Set delete callback
         self.view.delete_message = self.handle_delete_message
         
-        # Load initial messages
-        self.refresh_messages()
+        # Don't load messages here - they will be loaded when the user switches to the messages page
     
     def get_current_user_id(self):
         """Get the current logged-in user's ID."""
@@ -47,6 +44,9 @@ class MessagesController:
         """Refresh the messages list from database."""
         try:
             messages = self.model.list_messages(self.current_user_id)
+            # Add current_user_id to each message for display logic
+            for msg in messages:
+                msg['current_user_id'] = self.current_user_id
             self.view.populate_messages(messages)
         except Exception as e:
             print(f"Error loading messages: {e}")
@@ -95,6 +95,9 @@ class MessagesController:
                 # Save message to database
                 self.model.add_message(self.current_user_id, recipient_id, category, subject, body)
                 
+                # Refresh the messages list
+                self.refresh_messages()
+                
                 # Show success message
                 msg = QMessageBox(self.view)
                 msg.setIcon(QMessageBox.Icon.Information)
@@ -112,39 +115,6 @@ class MessagesController:
             msg.exec()
             import traceback
             traceback.print_exc()
-    
-    def handle_sort(self):
-        """Handle sorting messages."""
-        try:
-            # Toggle between ascending and descending by date
-            messages = self.model.list_messages()
-            # Reverse the order
-            messages.reverse()
-            self.view.populate_messages(messages)
-            
-            msg = QMessageBox(self.view)
-            msg.setIcon(QMessageBox.Icon.Information)
-            msg.setWindowTitle("Sorted")
-            msg.setText("Messages sorted by date.")
-            msg.setStyleSheet("QLabel { color: #000000; }")
-            msg.exec()
-            
-        except Exception as e:
-            msg = QMessageBox(self.view)
-            msg.setIcon(QMessageBox.Icon.Critical)
-            msg.setWindowTitle("Error")
-            msg.setText(f"Failed to sort messages:\n{e}")
-            msg.setStyleSheet("QLabel { color: #000000; }")
-            msg.exec()
-    
-    def handle_archive(self):
-        """Handle archiving messages."""
-        msg = QMessageBox(self.view)
-        msg.setIcon(QMessageBox.Icon.Information)
-        msg.setWindowTitle("Archive")
-        msg.setText("Archive feature - moves old messages to archive.\n\nThis would filter and show only archived messages.")
-        msg.setStyleSheet("QLabel { color: #000000; }")
-        msg.exec()
     
     def handle_delete_message(self, message_id):
         """Handle deleting a message."""
