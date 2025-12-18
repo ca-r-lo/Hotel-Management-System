@@ -607,3 +607,101 @@ class MessageModel:
             return True
         finally:
             conn.close()
+
+
+class DashboardModel:
+    """Model for fetching dashboard statistics and KPIs."""
+    
+    @staticmethod
+    def get_inventory_value():
+        """Calculate total inventory value (sum of unit_cost * stock_qty for all items)."""
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT SUM(unit_cost * stock_qty) as total_value FROM items")
+            row = cur.fetchone()
+            if row:
+                try:
+                    total = row['total_value'] if row['total_value'] is not None else 0
+                except (TypeError, KeyError):
+                    total = row[0] if row[0] is not None else 0
+                return float(total)
+            return 0.0
+        except Exception as e:
+            print(f"[DASHBOARD] Error calculating inventory value: {e}")
+            return 0.0
+        finally:
+            conn.close()
+    
+    @staticmethod
+    def get_total_wastages():
+        """Get total number of damaged/wasted items."""
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT SUM(quantity) as total_wastages FROM damages")
+            row = cur.fetchone()
+            if row:
+                try:
+                    total = row['total_wastages'] if row['total_wastages'] is not None else 0
+                except (TypeError, KeyError):
+                    total = row[0] if row[0] is not None else 0
+                return int(total)
+            return 0
+        except Exception as e:
+            print(f"[DASHBOARD] Error calculating wastages: {e}")
+            return 0
+        finally:
+            conn.close()
+    
+    @staticmethod
+    def get_inventory_items_count():
+        """Get total count of distinct inventory items."""
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT COUNT(*) as item_count FROM items")
+            row = cur.fetchone()
+            if row:
+                try:
+                    count = row['item_count']
+                except (TypeError, KeyError):
+                    count = row[0]
+                return int(count)
+            return 0
+        except Exception as e:
+            print(f"[DASHBOARD] Error counting inventory items: {e}")
+            return 0
+        finally:
+            conn.close()
+    
+    @staticmethod
+    def get_low_stock_count():
+        """Get count of items with stock below minimum threshold."""
+        conn = get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute("SELECT COUNT(*) as low_stock_count FROM items WHERE stock_qty <= min_stock")
+            row = cur.fetchone()
+            if row:
+                try:
+                    count = row['low_stock_count']
+                except (TypeError, KeyError):
+                    count = row[0]
+                return int(count)
+            return 0
+        except Exception as e:
+            print(f"[DASHBOARD] Error counting low stock items: {e}")
+            return 0
+        finally:
+            conn.close()
+    
+    @staticmethod
+    def get_all_kpis():
+        """Get all dashboard KPIs in one call."""
+        return {
+            'inventory_value': DashboardModel.get_inventory_value(),
+            'wastages': DashboardModel.get_total_wastages(),
+            'inventory_items': DashboardModel.get_inventory_items_count(),
+            'low_stocks': DashboardModel.get_low_stock_count()
+        }

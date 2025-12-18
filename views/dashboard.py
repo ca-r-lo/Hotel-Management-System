@@ -16,8 +16,8 @@ class DashboardWindow(QMainWindow):
     # Define role-based access control
     ROLE_PAGES = {
         'Purchase Admin': ['DASHBOARD', 'PURCHASE', 'INVENTORY', 'REPORTS', 'MESSAGES'],
-        'Owner': ['DASHBOARD', 'REPORTS', 'MESSAGES'],
-        'Department': ['DASHBOARD', 'PURCHASE', 'INVENTORY', 'MESSAGES']
+        'Owner': ['DASHBOARD', 'TRANS HISTORY', 'DEPT OVERVIEW', 'REPORTS', 'MESSAGES'],
+        'Department Manager': ['DASHBOARD', 'PURCHASE', 'INVENTORY', 'MESSAGES']
     }
     
     def __init__(self):
@@ -52,24 +52,105 @@ class DashboardWindow(QMainWindow):
             QPushButton#ActiveNav { background-color: #0056b3; color: white; }
         """)
         sidebar_layout = QVBoxLayout(self.sidebar)
+        sidebar_layout.setSpacing(5)
+        sidebar_layout.setContentsMargins(0, 20, 0, 20)
         
+        # Welcome message
+        welcome_label = QLabel("Welcome back!")
+        welcome_label.setStyleSheet("color: #6b7280; font-size: 11px; font-weight: 600; border:none; padding: 0 20px;")
+        sidebar_layout.addWidget(welcome_label)
+        
+        # Profile container
         profile_container = QFrame()
-        profile_lay = QVBoxLayout(profile_container)
-        self.name_lbl = QLabel("USER_ADMIN")
-        self.name_lbl.setStyleSheet("color: #111827; font-size: 15px; font-weight: 700; border:none;")
-        self.role_lbl = QLabel("Purchase Manager")
-        self.role_lbl.setStyleSheet("color: #0056b3; font-size: 11px; font-weight: 600; border:none;")
-        profile_lay.addWidget(self.name_lbl)
-        profile_lay.addWidget(self.role_lbl)
+        profile_container.setStyleSheet("background-color: transparent; border: none; padding: 10px 20px;")
+        profile_lay = QHBoxLayout(profile_container)
+        profile_lay.setSpacing(12)
+        
+        # Profile icon (circle with initial)
+        profile_icon = QLabel("👤")
+        profile_icon.setFixedSize(50, 50)
+        profile_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        profile_icon.setStyleSheet("""
+            background-color: #e5e7eb;
+            border-radius: 25px;
+            font-size: 24px;
+            border: none;
+        """)
+        profile_lay.addWidget(profile_icon)
+        
+        # Name and role
+        name_role_container = QVBoxLayout()
+        name_role_container.setSpacing(2)
+        self.name_lbl = QLabel("Director Name")
+        self.name_lbl.setStyleSheet("color: #111827; font-size: 14px; font-weight: 700; border:none;")
+        self.role_lbl = QLabel("Director")
+        self.role_lbl.setStyleSheet("color: #6b7280; font-size: 11px; font-weight: 500; border:none;")
+        name_role_container.addWidget(self.name_lbl)
+        name_role_container.addWidget(self.role_lbl)
+        profile_lay.addLayout(name_role_container)
+        profile_lay.addStretch()
+        
         sidebar_layout.addWidget(profile_container)
+        
+        # Separator
+        separator1 = QFrame()
+        separator1.setFrameShape(QFrame.Shape.HLine)
+        separator1.setStyleSheet("background-color: #e5e7eb; max-height: 1px; border: none; margin: 10px 15px;")
+        sidebar_layout.addWidget(separator1)
 
         self.nav_btns = {}
-        nav_pages = ["DASHBOARD", "PURCHASE", "INVENTORY", "REPORTS", "MESSAGES"]
+        nav_pages = ["DASHBOARD", "TRANS HISTORY", "DEPT OVERVIEW", "PURCHASE", "INVENTORY", "REPORTS", "MESSAGES"]
         for text in nav_pages:
             btn = QPushButton(text)
             if text == "DASHBOARD": btn.setObjectName("ActiveNav")
             sidebar_layout.addWidget(btn)
             self.nav_btns[text] = btn
+        
+        # Separator before notifications
+        separator2 = QFrame()
+        separator2.setFrameShape(QFrame.Shape.HLine)
+        separator2.setStyleSheet("background-color: #e5e7eb; max-height: 1px; border: none; margin: 10px 15px;")
+        sidebar_layout.addWidget(separator2)
+        
+        # Notifications section
+        notifications_header = QLabel("Notifications")
+        notifications_header.setStyleSheet("color: #111827; font-size: 12px; font-weight: 700; border:none; padding: 10px 20px 5px 20px;")
+        sidebar_layout.addWidget(notifications_header)
+        
+        # Notification items container with scroll
+        from PyQt6.QtWidgets import QScrollArea
+        notifications_scroll = QScrollArea()
+        notifications_scroll.setWidgetResizable(True)
+        notifications_scroll.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background-color: transparent;
+            }
+            QScrollBar:vertical {
+                border: none;
+                background: #f3f4f6;
+                width: 6px;
+                margin: 0px;
+            }
+            QScrollBar::handle:vertical {
+                background: #d1d5db;
+                border-radius: 3px;
+                min-height: 20px;
+            }
+        """)
+        
+        notifications_widget = QWidget()
+        notifications_widget.setStyleSheet("background-color: transparent; border: none;")
+        notifications_layout = QVBoxLayout(notifications_widget)
+        notifications_layout.setContentsMargins(10, 0, 10, 0)
+        notifications_layout.setSpacing(5)
+        
+        # Add placeholder notifications (these will be populated dynamically)
+        self.notifications_layout = notifications_layout
+        notifications_layout.addStretch()
+        
+        notifications_scroll.setWidget(notifications_widget)
+        sidebar_layout.addWidget(notifications_scroll)
 
         sidebar_layout.addStretch()
         
@@ -123,41 +204,71 @@ class DashboardWindow(QMainWindow):
         dash_page_layout.setContentsMargins(0, 0, 0, 0)
         dash_page_layout.setSpacing(20)
 
-        kpi_row_layout = QHBoxLayout()
-        kpi_row_layout.setSpacing(20)
-        kpi_items = [("INVENTORY VALUE", "₱ 0.00"), ("LOW STOCK ALERT", "0"), ("INVENTORY ITEMS", "0")]
-        for title, val in kpi_items:
-            card = QFrame()
-            card.setFixedHeight(150)
-            card.setStyleSheet("background-color: white; border: 1px solid #d1d5db; border-radius: 2px;")
-            card_lay = QVBoxLayout(card)
-            v_lbl = QLabel(val)
-            v_lbl.setFont(QFont("Inter", 28, QFont.Weight.Bold))
-            v_lbl.setStyleSheet("border:none; color: #111827;")
-            v_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            t_lbl = QLabel(title)
-            t_lbl.setStyleSheet("border:none; color: #6b7280; font-size: 11px; font-weight: 700;")
-            t_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            card_lay.addWidget(v_lbl)
-            card_lay.addWidget(t_lbl)
-            kpi_row_layout.addWidget(card)
-        dash_page_layout.addLayout(kpi_row_layout)
+        # KPI Cards in 2x2 grid
+        kpi_grid_layout = QVBoxLayout()
+        kpi_grid_layout.setSpacing(20)
         
-        self.chart_canvas = QFrame()
-        self.chart_canvas.setStyleSheet("background-color: transparent; border: 1px dashed #d1d5db; border-radius: 2px;")
-        dash_page_layout.addWidget(self.chart_canvas)
-        dash_page_layout.setStretch(1, 1)
+        # First row
+        kpi_row1_layout = QHBoxLayout()
+        kpi_row1_layout.setSpacing(20)
+        
+        # Inventory Value Card
+        inv_value_card, self.inventory_value_label = self._create_kpi_card("0", "Inventory Value")
+        kpi_row1_layout.addWidget(inv_value_card)
+        
+        # Wastages Card
+        wastages_card, self.wastages_label = self._create_kpi_card("0", "Wastages")
+        kpi_row1_layout.addWidget(wastages_card)
+        
+        kpi_grid_layout.addLayout(kpi_row1_layout)
+        
+        # Second row
+        kpi_row2_layout = QHBoxLayout()
+        kpi_row2_layout.setSpacing(20)
+        
+        # Inventory Items Card
+        inv_items_card, self.inventory_items_label = self._create_kpi_card("0", "Inventory Items")
+        kpi_row2_layout.addWidget(inv_items_card)
+        
+        # Low Stocks Card
+        low_stocks_card, self.low_stocks_label = self._create_kpi_card("0", "Low Stocks")
+        kpi_row2_layout.addWidget(low_stocks_card)
+        
+        kpi_grid_layout.addLayout(kpi_row2_layout)
+        
+        dash_page_layout.addLayout(kpi_grid_layout)
+        dash_page_layout.addStretch()
 
-        # PAGE 2: PURCHASE (Initialized and added AFTER self.main_stack exists)
+        # PAGE 2: TRANS HISTORY (Transaction History)
+        self.trans_history_page = QWidget()
+        trans_history_layout = QVBoxLayout(self.trans_history_page)
+        trans_history_layout.setContentsMargins(20, 20, 20, 20)
+        trans_history_label = QLabel("Transaction History - Coming Soon")
+        trans_history_label.setFont(QFont("Arial", 18))
+        trans_history_label.setStyleSheet("color: #6b7280;")
+        trans_history_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        trans_history_layout.addWidget(trans_history_label)
+        
+        # PAGE 3: DEPT OVERVIEW (Department Overview)
+        self.dept_overview_page = QWidget()
+        dept_overview_layout = QVBoxLayout(self.dept_overview_page)
+        dept_overview_layout.setContentsMargins(20, 20, 20, 20)
+        dept_overview_label = QLabel("Department Overview - Coming Soon")
+        dept_overview_label.setFont(QFont("Arial", 18))
+        dept_overview_label.setStyleSheet("color: #6b7280;")
+        dept_overview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        dept_overview_layout.addWidget(dept_overview_label)
+        
+        # PAGE 4: PURCHASE (Initialized and added AFTER self.main_stack exists)
         self.purchase_page = PurchasePage()
         
-        # PAGE 3: INVENTORY
+        # PAGE 5: INVENTORY
         self.inventory_page = InventoryPage()
         
-        # PAGE 4: REPORTS
+        # PAGE 6: REPORTS
         self.reports_page = ReportsPage()
         
-        # PAGE 5: MESSAGES
+        # PAGE 7: MESSAGES
         self.messages_page = MessagesPage()
         
         # 5. Logic & Controllers (Initialized now that views exist)
@@ -169,21 +280,25 @@ class DashboardWindow(QMainWindow):
         self.messages_ctrl = MessagesController(self.messages_page, self.m_model, self)
 
         # 6. Assemble Stack
-        self.main_stack.addWidget(self.dash_page)     # Index 0
-        self.main_stack.addWidget(self.purchase_page) # Index 1
-        self.main_stack.addWidget(self.inventory_page) # Index 2
-        self.main_stack.addWidget(self.reports_page)  # Index 3
-        self.main_stack.addWidget(self.messages_page)  # Index 4
+        self.main_stack.addWidget(self.dash_page)          # Index 0
+        self.main_stack.addWidget(self.trans_history_page) # Index 1
+        self.main_stack.addWidget(self.dept_overview_page) # Index 2
+        self.main_stack.addWidget(self.purchase_page)      # Index 3
+        self.main_stack.addWidget(self.inventory_page)     # Index 4
+        self.main_stack.addWidget(self.reports_page)       # Index 5
+        self.main_stack.addWidget(self.messages_page)      # Index 6
 
         content_main_layout.addWidget(self.main_stack)
         self.main_layout.addWidget(content_container)
 
         # 7. Connect Navigation
         self.nav_btns["DASHBOARD"].clicked.connect(lambda: self.switch_page(0, "DASHBOARD"))
-        self.nav_btns["PURCHASE"].clicked.connect(lambda: self.switch_page(1, "PURCHASE"))
-        self.nav_btns["INVENTORY"].clicked.connect(lambda: self.switch_page(2, "INVENTORY"))
-        self.nav_btns["REPORTS"].clicked.connect(lambda: self.switch_page(3, "REPORTS"))
-        self.nav_btns["MESSAGES"].clicked.connect(lambda: self.switch_page(4, "MESSAGES"))
+        self.nav_btns["TRANS HISTORY"].clicked.connect(lambda: self.switch_page(1, "TRANS HISTORY"))
+        self.nav_btns["DEPT OVERVIEW"].clicked.connect(lambda: self.switch_page(2, "DEPT OVERVIEW"))
+        self.nav_btns["PURCHASE"].clicked.connect(lambda: self.switch_page(3, "PURCHASE"))
+        self.nav_btns["INVENTORY"].clicked.connect(lambda: self.switch_page(4, "INVENTORY"))
+        self.nav_btns["REPORTS"].clicked.connect(lambda: self.switch_page(5, "REPORTS"))
+        self.nav_btns["MESSAGES"].clicked.connect(lambda: self.switch_page(6, "MESSAGES"))
         
         # Connect Logout
         self.logout_btn.clicked.connect(self.handle_logout)
@@ -210,6 +325,88 @@ class DashboardWindow(QMainWindow):
         # Switch to dashboard on login
         self.switch_page(0, "DASHBOARD")
     
+    def add_notification(self, message, type="info"):
+        """Add a notification to the sidebar."""
+        notification_frame = QFrame()
+        notification_frame.setStyleSheet("""
+            QFrame {
+                background-color: #f9fafb;
+                border-left: 3px solid #0056b3;
+                border-radius: 4px;
+                padding: 8px;
+            }
+        """)
+        notification_layout = QVBoxLayout(notification_frame)
+        notification_layout.setContentsMargins(8, 8, 8, 8)
+        
+        notification_label = QLabel(message)
+        notification_label.setWordWrap(True)
+        notification_label.setStyleSheet("border: none; color: #374151; font-size: 11px; font-weight: 500;")
+        notification_layout.addWidget(notification_label)
+        
+        # Insert before the stretch
+        self.notifications_layout.insertWidget(self.notifications_layout.count() - 1, notification_frame)
+    
+    def refresh_dashboard_kpis(self):
+        """Refresh dashboard KPI values from database."""
+        try:
+            from models.purchase import DashboardModel
+            
+            kpis = DashboardModel.get_all_kpis()
+            
+            # Update Inventory Value (format as currency)
+            inventory_value = kpis['inventory_value']
+            self.inventory_value_label.setText(f"₱ {inventory_value:,.2f}")
+            
+            # Update Wastages
+            wastages = kpis['wastages']
+            self.wastages_label.setText(str(wastages))
+            
+            # Update Inventory Items
+            inventory_items = kpis['inventory_items']
+            self.inventory_items_label.setText(str(inventory_items))
+            
+            # Update Low Stocks
+            low_stocks = kpis['low_stocks']
+            self.low_stocks_label.setText(str(low_stocks))
+            
+        except Exception as e:
+            print(f"Error refreshing dashboard KPIs: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def _create_kpi_card(self, value, title):
+        """Create a KPI card widget and return both card and value label."""
+        card = QFrame()
+        card.setMinimumHeight(200)
+        card.setStyleSheet("""
+            QFrame {
+                background-color: white;
+                border: 2px solid #e5e7eb;
+                border-radius: 8px;
+            }
+        """)
+        
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(30, 30, 30, 30)
+        card_layout.setSpacing(15)
+        
+        # Value label (large number)
+        value_label = QLabel(value)
+        value_label.setFont(QFont("Arial", 48, QFont.Weight.Bold))
+        value_label.setStyleSheet("border: none; color: #111827;")
+        value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        card_layout.addWidget(value_label)
+        
+        # Title label
+        title_label = QLabel(title)
+        title_label.setFont(QFont("Arial", 14))
+        title_label.setStyleSheet("border: none; color: #6b7280; font-weight: 500; font-style: italic;")
+        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        card_layout.addWidget(title_label)
+        
+        return card, value_label
+    
     def handle_logout(self):
         """Handle logout - clear session and return to login."""
         from PyQt6.QtWidgets import QMessageBox
@@ -233,6 +430,10 @@ class DashboardWindow(QMainWindow):
     def switch_page(self, index, title):
         self.main_stack.setCurrentIndex(index)
         self.title_label.setText(title)
+        
+        # Refresh dashboard KPIs when switching to dashboard page
+        if title == "DASHBOARD":
+            self.refresh_dashboard_kpis()
         
         # Refresh messages when switching to messages page
         if title == "MESSAGES" and self.current_user:
