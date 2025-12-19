@@ -77,11 +77,18 @@ def create_more_icon(size=16):
 class AddStockDialog(QDialog):
     """Dialog for adding new inventory items."""
     
-    def __init__(self, parent=None, item_data=None):
+    def __init__(self, parent=None, item_data=None, is_department_user=False):
         super().__init__(parent)
         self.item_data = item_data
         self.is_edit_mode = item_data is not None
-        self.setWindowTitle("EDIT ITEM" if self.is_edit_mode else "ADD STOCKS")
+        self.is_department_user = is_department_user
+        
+        # Department users can only update stock quantity
+        if self.is_department_user:
+            self.setWindowTitle("UPDATE STOCK")
+        else:
+            self.setWindowTitle("EDIT ITEM" if self.is_edit_mode else "ADD STOCKS")
+        
         # Make dialog resizable with minimum and initial size
         self.setMinimumSize(480, 500)
         self.resize(550, 550)
@@ -128,7 +135,12 @@ class AddStockDialog(QDialog):
         layout.setSpacing(20)
 
         # Title
-        title = QLabel("EDIT ITEM" if self.is_edit_mode else "ADD STOCKS")
+        if self.is_department_user:
+            title_text = "UPDATE STOCK"
+        else:
+            title_text = "EDIT ITEM" if self.is_edit_mode else "ADD STOCKS"
+        
+        title = QLabel(title_text)
         title.setFont(QFont("Arial", 16, QFont.Weight.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet(f"color: {STYLE_NAVY}; padding-bottom: 10px; border-bottom: 2px solid {STYLE_BORDER};")
@@ -211,8 +223,8 @@ class AddStockDialog(QDialog):
         # Hidden category combo (for edit mode backward compatibility)
         self.category_cb = QComboBox()
         self.category_cb.addItems(["Housekeeping", "Kitchen", "Front Desk", "Maintenance", "General"])
-        self.category_cb.setVisible(self.is_edit_mode)
-        if self.is_edit_mode:
+        self.category_cb.setVisible(self.is_edit_mode and not self.is_department_user)
+        if self.is_edit_mode and not self.is_department_user:
             self.category_cb.setMinimumHeight(35)
             self.category_cb.setStyleSheet(f"""
                 QComboBox {{
@@ -231,11 +243,11 @@ class AddStockDialog(QDialog):
                 }}
             """)
             self.category_cb.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-            # Replace the read-only display with editable combo in edit mode
+            # Replace the read-only display with editable combo in edit mode (but not for department users)
             self.category_display.setVisible(False)
             form_layout.addWidget(self.category_cb)
 
-        # Unit (read-only in add mode, editable in edit mode)
+        # Unit (read-only in add mode or for department users, editable in edit mode for admins)
         unit_label = QLabel("UNIT:")
         unit_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold;")
         form_layout.addWidget(unit_label)
@@ -243,7 +255,7 @@ class AddStockDialog(QDialog):
         self.unit_edit = QLineEdit()
         self.unit_edit.setMinimumHeight(35)
         self.unit_edit.setPlaceholderText("e.g., pcs, boxes, kg")
-        if not self.is_edit_mode:
+        if not self.is_edit_mode or self.is_department_user:
             self.unit_edit.setReadOnly(True)
             self.unit_edit.setStyleSheet(f"""
                 QLineEdit {{
@@ -268,7 +280,7 @@ class AddStockDialog(QDialog):
         self.unit_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         form_layout.addWidget(self.unit_edit)
 
-        # Unit Cost (read-only in add mode)
+        # Unit Cost (read-only in add mode or for department users)
         unit_cost_label = QLabel("UNIT COST (₱):")
         unit_cost_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold;")
         form_layout.addWidget(unit_cost_label)
@@ -277,7 +289,7 @@ class AddStockDialog(QDialog):
         self.unit_cost_spin.setRange(0, 999999)
         self.unit_cost_spin.setMinimumHeight(35)
         self.unit_cost_spin.setPrefix("₱ ")
-        if not self.is_edit_mode:
+        if not self.is_edit_mode or self.is_department_user:
             self.unit_cost_spin.setReadOnly(True)
             self.unit_cost_spin.setStyleSheet(f"""
                 QSpinBox {{
@@ -343,7 +355,7 @@ class AddStockDialog(QDialog):
         self.stock_spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         form_layout.addWidget(self.stock_spin)
 
-        # Minimum Stock Level
+        # Minimum Stock Level (read-only for department users)
         min_label = QLabel("MINIMUM STOCK LEVEL:")
         min_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold;")
         form_layout.addWidget(min_label)
@@ -351,16 +363,28 @@ class AddStockDialog(QDialog):
         self.min_spin = QSpinBox()
         self.min_spin.setRange(0, 999999)
         self.min_spin.setMinimumHeight(35)
-        self.min_spin.setStyleSheet(f"""
-            QSpinBox {{
-                border: 2px solid {STYLE_BORDER};
-                border-radius: 4px;
-                padding: 5px 10px;
-                background-color: white;
-                color: {STYLE_NAVY};
-            }}
-            QSpinBox:focus {{ border-color: {STYLE_BLUE}; }}
-        """)
+        if self.is_department_user:
+            self.min_spin.setReadOnly(True)
+            self.min_spin.setStyleSheet(f"""
+                QSpinBox {{
+                    border: 2px solid {STYLE_BORDER};
+                    border-radius: 4px;
+                    padding: 5px 10px;
+                    background-color: #f9fafb;
+                    color: #6b7280;
+                }}
+            """)
+        else:
+            self.min_spin.setStyleSheet(f"""
+                QSpinBox {{
+                    border: 2px solid {STYLE_BORDER};
+                    border-radius: 4px;
+                    padding: 5px 10px;
+                    background-color: white;
+                    color: {STYLE_NAVY};
+                }}
+                QSpinBox:focus {{ border-color: {STYLE_BLUE}; }}
+            """)
         self.min_spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         form_layout.addWidget(self.min_spin)
 
