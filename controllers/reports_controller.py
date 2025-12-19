@@ -48,22 +48,19 @@ class ReportsController:
     def refresh_charts(self):
         """Refresh chart data based on current filters and department."""
         try:
-            # Fetch inventory data for pie chart (department-specific)
-            inventory_data = self.get_department_stock_levels()
+            # Fetch all inventory data for bar chart
+            inventory_data = self.get_all_stock_levels()
             
-            # Fetch stock trend data for line chart
-            trend_data = self.get_stock_trend_data()
-            
-            # Update the charts in the view
-            self.view.update_charts(inventory_data, trend_data)
+            # Update the chart in the view
+            self.view.update_charts(inventory_data)
             
         except Exception as e:
             print(f"Error refreshing charts: {e}")
             import traceback
             traceback.print_exc()
     
-    def get_department_stock_levels(self):
-        """Get stock levels for the current department (for pie chart)."""
+    def get_all_stock_levels(self):
+        """Get all stock levels for the bar chart."""
         try:
             item_model = ItemModel()
             items = item_model.list_items()
@@ -73,48 +70,11 @@ class ReportsController:
                 items = [item for item in items 
                         if item.get('category', '').lower() == self.view.current_department.lower()]
             
-            # Return list of (item_name, stock_qty)
-            result = []
-            for item in items:
-                name = item.get('name', 'Unknown')
-                stock_qty = item.get('stock_qty', 0)
-                if stock_qty > 0:  # Only show items with stock
-                    result.append((name, stock_qty))
-            
-            # Sort by stock quantity descending and take top 10
-            result.sort(key=lambda x: x[1], reverse=True)
-            return result[:10] if len(result) > 10 else result
+            # Return all items with their stock data
+            return items
             
         except Exception as e:
-            print(f"Error getting department stock levels: {e}")
-            import traceback
-            traceback.print_exc()
-            return []
-    
-    def get_stock_trend_data(self):
-        """Get stock trend data for line chart."""
-        try:
-            item_model = ItemModel()
-            items = item_model.list_items()
-            
-            # Filter by department if Department role
-            if self.view.current_role == "Department" and self.view.current_department:
-                items = [item for item in items 
-                        if item.get('category', '').lower() == self.view.current_department.lower()]
-            
-            # Return list of (item_name, stock_qty) for all items
-            result = []
-            for item in items:
-                name = item.get('name', 'Unknown')
-                stock_qty = item.get('stock_qty', 0)
-                result.append((name, stock_qty))
-            
-            # Sort by name
-            result.sort(key=lambda x: x[0])
-            return result
-            
-        except Exception as e:
-            print(f"Error getting stock trend data: {e}")
+            print(f"Error getting all stock levels: {e}")
             import traceback
             traceback.print_exc()
             return []

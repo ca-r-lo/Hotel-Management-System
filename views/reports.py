@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QDate
 from PyQt6.QtGui import QFont, QPainter, QPen, QColor
-from PyQt6.QtCharts import QChart, QChartView, QPieSeries, QLineSeries, QValueAxis
+from PyQt6.QtCharts import QChart, QChartView, QBarSeries, QBarSet, QBarCategoryAxis, QValueAxis
 from PyQt6.QtCore import Qt as QtCore
 
 # --- Shared Style Constants ---
@@ -422,111 +422,73 @@ class ReportsPage(QWidget):
         filters_layout.addStretch()
         self.layout.addLayout(filters_layout)
 
-        # Charts Container
-        charts_container = QFrame()
-        charts_container.setStyleSheet(f"background-color: white; border: 1px solid {STYLE_BORDER}; border-radius: 2px;")
-        charts_layout = QHBoxLayout(charts_container)
-        charts_layout.setContentsMargins(20, 20, 20, 20)
-        charts_layout.setSpacing(20)
+        # Bar Chart Container - Full Width
+        chart_container = QFrame()
+        chart_container.setStyleSheet(f"background-color: white; border: 1px solid {STYLE_BORDER}; border-radius: 2px;")
+        chart_layout = QVBoxLayout(chart_container)
+        chart_layout.setContentsMargins(20, 20, 20, 20)
 
-        # Pie Chart
-        self.pie_chart = self.create_sample_pie_chart()
-        self.pie_view = QChartView(self.pie_chart)
-        self.pie_view.setRenderHint(QPainter.RenderHint.Antialiasing)
-        self.pie_view.setStyleSheet("background-color: transparent; border: none;")
-        charts_layout.addWidget(self.pie_view)
+        # Bar Chart
+        self.bar_chart = self.create_sample_bar_chart()
+        self.bar_view = QChartView(self.bar_chart)
+        self.bar_view.setRenderHint(QPainter.RenderHint.Antialiasing)
+        self.bar_view.setStyleSheet("background-color: transparent; border: none;")
+        self.bar_view.setMinimumHeight(400)
+        chart_layout.addWidget(self.bar_view)
 
-        # Line Chart
-        self.line_chart = self.create_sample_line_chart()
-        self.line_view = QChartView(self.line_chart)
-        self.line_view.setRenderHint(QPainter.RenderHint.Antialiasing)
-        self.line_view.setStyleSheet("background-color: transparent; border: none;")
-        charts_layout.addWidget(self.line_view)
+        self.layout.addWidget(chart_container)
 
-        self.layout.addWidget(charts_container)
+    def update_charts(self, inventory_data):
+        """Update bar chart with real data from database."""
+        # Update bar chart with all inventory items
+        self.bar_chart = self.create_inventory_bar_chart(inventory_data)
+        self.bar_view.setChart(self.bar_chart)
 
-    def update_charts(self, inventory_data, trend_data):
-        """Update charts with real data from database."""
-        # Update pie chart
-        self.pie_chart = self.create_inventory_pie_chart(inventory_data)
-        self.pie_view.setChart(self.pie_chart)
+    def create_inventory_bar_chart(self, inventory_data):
+        """Create a bar chart showing all inventory stock levels."""
+        bar_set = QBarSet("Stock Quantity")
+        bar_set.setColor(QColor(STYLE_BLUE))
         
-        # Update line chart
-        self.line_chart = self.create_trend_line_chart(trend_data)
-        self.line_view.setChart(self.line_chart)
-
-    def create_inventory_pie_chart(self, inventory_data):
-        """Create a pie chart showing inventory distribution by item or stock levels."""
-        series = QPieSeries()
+        categories = []
         
         if not inventory_data or len(inventory_data) == 0:
             # Show placeholder if no data
-            series.append("No Data", 100)
-            slice_item = series.slices()[0]
-            slice_item.setColor(Qt.GlobalColor.lightGray)
+            bar_set.append(0)
+            categories.append("No Data")
         else:
-            # Add data to pie chart
-            for item_name, value in inventory_data:
-                series.append(f"{item_name}: {int(value)}", value)
+            # Add all items to bar chart
+            for item in inventory_data:
+                item_name = item.get('name', 'Unknown')
+                stock_qty = item.get('stock_qty', 0)
+                
+                bar_set.append(stock_qty)
+                categories.append(item_name)
         
-        # Style slices with different colors
-        colors = [
-            "#0056b3",  # Blue
-            "#10b981",  # Green  
-            "#f59e0b",  # Orange
-            "#ef4444",  # Red
-            "#8b5cf6",  # Purple
-            "#06b6d4",  # Cyan
-            "#ec4899",  # Pink
-            "#f97316",  # Orange-red
-            "#14b8a6",  # Teal
-        ]
-        
-        for i, slice_item in enumerate(series.slices()):
-            slice_item.setLabelVisible(True)
-            slice_item.setPen(QPen(Qt.PenStyle.NoPen))
-            if inventory_data and len(inventory_data) > 0:
-                slice_item.setColor(QColor(colors[i % len(colors)]))
+        series = QBarSeries()
+        series.append(bar_set)
         
         chart = QChart()
         chart.addSeries(series)
-        chart.setTitle("Stock Distribution")
-        chart.setTitleFont(QFont("Arial", 14, QFont.Weight.Bold))
-        chart.legend().setVisible(True)
-        chart.legend().setAlignment(Qt.AlignmentFlag.AlignBottom)
-        chart.setBackgroundVisible(False)
+        chart.setTitle("ALL STOCK LEVELS")
+        chart.setTitleFont(QFont("Arial", 16, QFont.Weight.Bold))
+        chart.setAnimationOptions(QChart.AnimationOption.SeriesAnimations)
         
-        return chart
-
-    def create_trend_line_chart(self, trend_data):
-        """Create a line chart showing stock levels over time or comparison."""
-        chart = QChart()
+        # Category axis (X-axis)
+        axis_x = QBarCategoryAxis()
+        axis_x.append(categories)
+        axis_x.setLabelsAngle(-45)  # Rotate labels for better readability
+        axis_x.setLabelsColor(QColor(STYLE_NAVY))
+        chart.addAxis(axis_x, Qt.AlignmentFlag.AlignBottom)
+        series.attachAxis(axis_x)
         
-        if not trend_data or len(trend_data) == 0:
-            # Show placeholder if no data
-            series = QLineSeries()
-            series.setName("No Data")
-            series.append(0, 0)
-            chart.addSeries(series)
-        else:
-            # trend_data should be list of tuples: [(item_name, quantity), ...]
-            # Convert to line series for display
-            series = QLineSeries()
-            series.setName("Stock Levels")
-            
-            for i, (item_name, quantity) in enumerate(trend_data):
-                series.append(i, quantity)
-            
-            chart.addSeries(series)
-        
-        chart.setTitle("Stock Levels Overview")
-        chart.setTitleFont(QFont("Arial", 14, QFont.Weight.Bold))
-        chart.createDefaultAxes()
-        
-        # Style axes
-        for axis in chart.axes():
-            axis.setLabelsColor(QColor(STYLE_NAVY))
-            axis.setGridLineColor(QColor(STYLE_BORDER))
+        # Value axis (Y-axis)
+        axis_y = QValueAxis()
+        axis_y.setLabelsColor(QColor(STYLE_NAVY))
+        axis_y.setGridLineColor(QColor(STYLE_BORDER))
+        axis_y.setTitleText("Quantity")
+        axis_y.setTitleFont(QFont("Arial", 11, QFont.Weight.Bold))
+        chart.addAxis(axis_y, Qt.AlignmentFlag.AlignLeft)
+        series.attachAxis(axis_y)
         
         chart.legend().setVisible(True)
         chart.legend().setAlignment(Qt.AlignmentFlag.AlignBottom)
@@ -534,31 +496,31 @@ class ReportsPage(QWidget):
         
         return chart
 
-    def create_sample_pie_chart(self):
-        """Create a sample pie chart for inventory distribution."""
-        series = QPieSeries()
-        series.append("Loading...", 100)
+    def create_sample_bar_chart(self):
+        """Create a sample bar chart for initial display."""
+        bar_set = QBarSet("Stock Quantity")
+        bar_set.setColor(QColor(STYLE_BLUE))
+        bar_set.append(0)
+        
+        series = QBarSeries()
+        series.append(bar_set)
         
         chart = QChart()
         chart.addSeries(series)
-        chart.setTitle("")
+        chart.setTitle("ALL STOCK LEVELS")
+        chart.setTitleFont(QFont("Arial", 16, QFont.Weight.Bold))
+        
+        axis_x = QBarCategoryAxis()
+        axis_x.append(["Loading..."])
+        chart.addAxis(axis_x, Qt.AlignmentFlag.AlignBottom)
+        series.attachAxis(axis_x)
+        
+        axis_y = QValueAxis()
+        axis_y.setTitleText("Quantity")
+        chart.addAxis(axis_y, Qt.AlignmentFlag.AlignLeft)
+        series.attachAxis(axis_y)
+        
         chart.legend().setVisible(False)
-        chart.setBackgroundVisible(False)
-        
-        return chart
-
-    def create_sample_line_chart(self):
-        """Create a sample line chart for trends."""
-        series = QLineSeries()
-        series.setName("Loading...")
-        series.append(0, 0)
-        
-        chart = QChart()
-        chart.addSeries(series)
-        chart.setTitle("")
-        chart.createDefaultAxes()
-        chart.legend().setVisible(True)
-        chart.legend().setAlignment(Qt.AlignmentFlag.AlignTop)
         chart.setBackgroundVisible(False)
         
         return chart
