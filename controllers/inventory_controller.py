@@ -259,13 +259,15 @@ class InventoryController:
             conn = get_conn()
             cur = conn.cursor()
             
-            # Query to get items from delivered purchase orders
+            # Query to get items from delivered purchase orders with remaining quantity tracking
             sql = f"""
                 SELECT 
                     pi.id as purchase_item_id,
                     pi.item_id,
                     COALESCE(pi.item_name, i.name) as item_name,
-                    pi.quantity as qty,
+                    pi.quantity as ordered_qty,
+                    COALESCE(pi.qty_added_to_inventory, 0) as qty_added,
+                    (pi.quantity - COALESCE(pi.qty_added_to_inventory, 0)) as qty_available,
                     pi.unit_price,
                     p.id as purchase_id,
                     i.category,
@@ -274,7 +276,7 @@ class InventoryController:
                 JOIN purchases p ON pi.purchase_id = p.id
                 LEFT JOIN items i ON pi.item_id = i.id
                 WHERE p.status IN ('received', 'delivered', 'completed')
-                AND COALESCE(pi.in_inventory, 0) = 0
+                AND (pi.quantity - COALESCE(pi.qty_added_to_inventory, 0)) > 0
                 ORDER BY p.created_at DESC, COALESCE(pi.item_name, i.name)
             """
             cur.execute(sql)
@@ -291,18 +293,21 @@ class InventoryController:
                         'purchase_item_id': row[0],
                         'item_id': row[1],
                         'item_name': row[2],
-                        'qty': row[3],
-                        'unit_price': row[4],
-                        'purchase_id': row[5],
-                        'category': row[6] if len(row) > 6 else 'General',
-                        'unit': row[7] if len(row) > 7 else 'pcs'
+                        'ordered_qty': row[3],
+                        'qty_added': row[4],
+                        'qty_available': row[5],
+                        'unit_price': row[6],
+                        'purchase_id': row[7],
+                        'category': row[8] if len(row) > 8 else 'General',
+                        'unit': row[9] if len(row) > 9 else 'pcs'
                     }
                 
-                # Create display text
+                # Create display text showing available quantity
                 item_name = row_dict.get('item_name', 'Unknown')
-                qty = row_dict.get('qty', 0)
+                qty_available = row_dict.get('qty_available', 0)
+                ordered_qty = row_dict.get('ordered_qty', 0)
                 purchase_id = row_dict.get('purchase_id', 0)
-                display_text = f"{item_name} - Order #{purchase_id:04d} (Qty: {qty})"
+                display_text = f"{item_name} - Order #{purchase_id:04d} (Available: {qty_available}/{ordered_qty})"
                 
                 # Add to combo box with data
                 dialog.item_selector.addItem(display_text, row_dict)
@@ -352,6 +357,7 @@ class InventoryController:
             
             # Check if item_id already exists in inventory
             item_id = data.get('item_id')
+            qty_to_add = data['stock_qty']
             
             if item_id:
                 # Item exists - update the quantity
@@ -361,17 +367,17 @@ class InventoryController:
                         SET stock_qty = stock_qty + ?
                         WHERE id = ?
                     """
-                    cur.execute(sql, (data['stock_qty'], item_id))
+                    cur.execute(sql, (qty_to_add, item_id))
                 else:
                     sql = """
                         UPDATE items 
                         SET stock_qty = stock_qty + %s
                         WHERE id = %s
                     """
-                    cur.execute(sql, (data['stock_qty'], item_id))
+                    cur.execute(sql, (qty_to_add, item_id))
                 
                 conn.commit()
-                success_msg = f"Added {data['stock_qty']} units to existing item!"
+                success_msg = f"Added {qty_to_add} units to existing item!"
             else:
                 # Item doesn't exist yet - create new entry
                 result = ItemModel.add_item(
@@ -379,7 +385,7 @@ class InventoryController:
                     category=data['category'],
                     unit=data['unit'],
                     unit_cost=data['unit_cost'],
-                    stock_qty=data['stock_qty'],
+                    stock_qty=qty_to_add,
                     min_stock=data.get('min_stock', 10)
                 )
                 
@@ -388,15 +394,44 @@ class InventoryController:
                 
                 success_msg = "Item added to inventory successfully!"
             
-            # Mark the purchase item as added to inventory (optional tracking)
+            # Update the purchase_items table to track how much was added
             purchase_item_id = data.get('purchase_item_id')
             if purchase_item_id:
                 if _paramstyle == 'qmark':
-                    sql = "UPDATE purchase_items SET in_inventory = 1 WHERE id = ?"
+                    # Increment qty_added_to_inventory
+                    sql = """
+                        UPDATE purchase_items 
+                        SET qty_added_to_inventory = COALESCE(qty_added_to_inventory, 0) + ?
+                        WHERE id = ?
+                    """
+                    cur.execute(sql, (qty_to_add, purchase_item_id))
+                    
+                    # Check if fully added, if so mark in_inventory = 1
+                    sql = """
+                        UPDATE purchase_items 
+                        SET in_inventory = 1
+                        WHERE id = ? 
+                        AND quantity <= COALESCE(qty_added_to_inventory, 0)
+                    """
                     cur.execute(sql, (purchase_item_id,))
                 else:
-                    sql = "UPDATE purchase_items SET in_inventory = %s WHERE id = %s"
-                    cur.execute(sql, (1, purchase_item_id))
+                    # Increment qty_added_to_inventory
+                    sql = """
+                        UPDATE purchase_items 
+                        SET qty_added_to_inventory = COALESCE(qty_added_to_inventory, 0) + %s
+                        WHERE id = %s
+                    """
+                    cur.execute(sql, (qty_to_add, purchase_item_id))
+                    
+                    # Check if fully added, if so mark in_inventory = 1
+                    sql = """
+                        UPDATE purchase_items 
+                        SET in_inventory = 1
+                        WHERE id = %s 
+                        AND quantity <= COALESCE(qty_added_to_inventory, 0)
+                    """
+                    cur.execute(sql, (purchase_item_id,))
+                    
                 conn.commit()
             
             conn.close()

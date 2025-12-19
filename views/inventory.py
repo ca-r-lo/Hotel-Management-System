@@ -302,6 +302,26 @@ class AddStockDialog(QDialog):
         self.unit_cost_spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         form_layout.addWidget(self.unit_cost_spin)
 
+        if not self.is_edit_mode:
+            # Add "Available to Add" info label in add mode
+            available_label = QLabel("AVAILABLE TO ADD:")
+            available_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold;")
+            form_layout.addWidget(available_label)
+            
+            self.available_info = QLabel("Select an item to see available quantity")
+            self.available_info.setMinimumHeight(35)
+            self.available_info.setStyleSheet(f"""
+                QLabel {{
+                    border: 2px solid {STYLE_BORDER};
+                    border-radius: 4px;
+                    padding: 5px 10px;
+                    background-color: #fef3c7;
+                    color: #92400e;
+                    font-weight: bold;
+                }}
+            """)
+            form_layout.addWidget(self.available_info)
+
         # Stock Quantity
         stock_label = QLabel("STOCK QUANTITY:")
         stock_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold;")
@@ -405,6 +425,17 @@ class AddStockDialog(QDialog):
             self.category_display.setText(item_data.get('category', 'General'))
             self.unit_edit.setText(item_data.get('unit', ''))
             self.unit_cost_spin.setValue(int(item_data.get('unit_price', 0)))
+            
+            # Update available quantity info and set max for stock spinbox
+            qty_available = item_data.get('qty_available', item_data.get('qty', 0))
+            ordered_qty = item_data.get('ordered_qty', item_data.get('qty', 0))
+            
+            if hasattr(self, 'available_info'):
+                self.available_info.setText(f"Ordered: {ordered_qty} | Available to Add: {qty_available}")
+            
+            # Set the maximum for stock spinbox to available quantity
+            self.stock_spin.setMaximum(qty_available)
+            self.stock_spin.setValue(min(qty_available, self.stock_spin.value()))
 
     def populate_fields(self):
         """Populate fields when editing."""
