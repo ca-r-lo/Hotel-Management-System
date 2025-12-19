@@ -478,12 +478,14 @@ class ReportsPage(QWidget):
         axis_x.append(categories)
         axis_x.setLabelsAngle(-45)  # Rotate labels for better readability
         axis_x.setLabelsColor(QColor(STYLE_NAVY))
+        axis_x.setLabelsFont(QFont("Arial", 11))  # Bigger readable font size
         chart.addAxis(axis_x, Qt.AlignmentFlag.AlignBottom)
         series.attachAxis(axis_x)
         
         # Value axis (Y-axis)
         axis_y = QValueAxis()
         axis_y.setLabelsColor(QColor(STYLE_NAVY))
+        axis_y.setLabelsFont(QFont("Arial", 11))  # Bigger readable font size
         axis_y.setGridLineColor(QColor(STYLE_BORDER))
         axis_y.setTitleText("Quantity")
         axis_y.setTitleFont(QFont("Arial", 11, QFont.Weight.Bold))

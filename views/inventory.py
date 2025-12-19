@@ -436,6 +436,21 @@ class AddStockDialog(QDialog):
             # Set the maximum for stock spinbox to available quantity
             self.stock_spin.setMaximum(qty_available)
             self.stock_spin.setValue(min(qty_available, self.stock_spin.value()))
+            
+            # Pre-fill minimum stock if item already exists in inventory
+            item_id = item_data.get('item_id')
+            if item_id:
+                try:
+                    from models.purchase import ItemModel
+                    existing_item = ItemModel.get_item_by_id(item_id)
+                    if existing_item:
+                        self.min_spin.setValue(int(existing_item.get('min_stock', 10)))
+                    else:
+                        self.min_spin.setValue(10)  # Default value
+                except:
+                    self.min_spin.setValue(10)  # Default value if error
+            else:
+                self.min_spin.setValue(10)  # Default value for new items
 
     def populate_fields(self):
         """Populate fields when editing."""

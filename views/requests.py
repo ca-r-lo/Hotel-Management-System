@@ -413,6 +413,7 @@ class RequestsPage(QWidget):
             actions_layout.addWidget(btn)
         
         actions_layout.addStretch()
+        self.actions_layout = actions_layout
         self.layout.addLayout(actions_layout)
         
         # Requests List (Scroll Area)

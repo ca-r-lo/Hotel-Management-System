@@ -140,52 +140,6 @@ class DashboardWindow(QMainWindow):
             sidebar_layout.addWidget(btn)
             self.nav_btns[text] = btn
         
-        # Separator before notifications
-        separator2 = QFrame()
-        separator2.setFrameShape(QFrame.Shape.HLine)
-        separator2.setStyleSheet("background-color: #e5e7eb; max-height: 1px; border: none; margin: 10px 15px;")
-        sidebar_layout.addWidget(separator2)
-        
-        # Notifications section
-        notifications_header = QLabel("Notifications")
-        notifications_header.setStyleSheet("color: #111827; font-size: 12px; font-weight: 700; border:none; padding: 10px 20px 5px 20px;")
-        sidebar_layout.addWidget(notifications_header)
-        
-        # Notification items container with scroll
-        from PyQt6.QtWidgets import QScrollArea
-        notifications_scroll = QScrollArea()
-        notifications_scroll.setWidgetResizable(True)
-        notifications_scroll.setStyleSheet("""
-            QScrollArea {
-                border: none;
-                background-color: transparent;
-            }
-            QScrollBar:vertical {
-                border: none;
-                background: #f3f4f6;
-                width: 6px;
-                margin: 0px;
-            }
-            QScrollBar::handle:vertical {
-                background: #d1d5db;
-                border-radius: 3px;
-                min-height: 20px;
-            }
-        """)
-        
-        notifications_widget = QWidget()
-        notifications_widget.setStyleSheet("background-color: transparent; border: none;")
-        notifications_layout = QVBoxLayout(notifications_widget)
-        notifications_layout.setContentsMargins(10, 0, 10, 0)
-        notifications_layout.setSpacing(5)
-        
-        # Add placeholder notifications (these will be populated dynamically)
-        self.notifications_layout = notifications_layout
-        notifications_layout.addStretch()
-        
-        notifications_scroll.setWidget(notifications_widget)
-        sidebar_layout.addWidget(notifications_scroll)
-
         sidebar_layout.addStretch()
         
         # Logout Button

@@ -43,6 +43,14 @@ class RequestsController:
         else:
             self.view.btn_send_request.show()
         
+        # Hide Archive and Sort buttons for Department role
+        if user_role == "Department":
+            self.view.btn_archive.hide()
+            self.view.btn_sort.hide()
+        else:
+            self.view.btn_archive.show()
+            self.view.btn_sort.show()
+        
         # Load requests
         self.refresh_requests()
     

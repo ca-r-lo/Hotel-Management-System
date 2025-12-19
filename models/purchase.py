@@ -384,6 +384,11 @@ class ItemModel:
             conn.close()
 
     @staticmethod
+    def get_item_by_id(item_id: int):
+        """Alias for get_item - get an item by its ID."""
+        return ItemModel.get_item(item_id)
+
+    @staticmethod
     def adjust_stock(item_id: int, delta: int):
         conn = get_conn()
         try:
