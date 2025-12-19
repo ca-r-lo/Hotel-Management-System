@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (
     QTableWidget, QTableWidgetItem, QHeaderView
 )
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor, QBrush
 
 class PurchasePage(QWidget):
     def __init__(self):
@@ -65,6 +66,9 @@ class PurchasePage(QWidget):
         ])
         self.history_table.setAlternatingRowColors(True)
         self.history_table.setShowGrid(False)
+        self.history_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.history_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self.history_table.setCursor(Qt.CursorShape.PointingHandCursor)
         self.history_table.setStyleSheet("""
             QTableWidget { 
                 background-color: white; 
@@ -87,6 +91,9 @@ class PurchasePage(QWidget):
                 border-bottom: 1px solid #f3f4f6; 
                 padding: 10px;
                 color: #111827;
+            }
+            QTableWidget::item:selected {
+                background-color: #e0f2fe;
             }
         """)
         # Make table responsive - use Stretch for most columns with minimum widths
@@ -118,8 +125,39 @@ class PurchasePage(QWidget):
             status = str(row.get('status', 'PENDING')).upper()
             created_by = row.get('created_by', 'N/A') if row.get('created_by') else 'N/A'
             
+            # Define status colors
+            status_colors = {
+                'PENDING': QColor('#fef3c7'),      # Yellow background
+                'RECEIVED': QColor('#d1fae5'),     # Green background
+                'DELIVERED': QColor('#d1fae5'),    # Green background
+                'COMPLETED': QColor('#d1fae5'),    # Green background
+                'CANCELLED': QColor('#fee2e2'),    # Red background
+                'REJECTED': QColor('#fee2e2')      # Red background
+            }
+            
+            status_text_colors = {
+                'PENDING': QColor('#92400e'),      # Dark yellow text
+                'RECEIVED': QColor('#065f46'),     # Dark green text
+                'DELIVERED': QColor('#065f46'),    # Dark green text
+                'COMPLETED': QColor('#065f46'),    # Dark green text
+                'CANCELLED': QColor('#991b1b'),    # Dark red text
+                'REJECTED': QColor('#991b1b')      # Dark red text
+            }
+            
             vals = [order_id, created_date, supplier_name, supplier_contact, expected_date, item_count, total, status, created_by]
             for c_idx, val in enumerate(vals):
                 item = QTableWidgetItem(str(val))
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                
+                # Store the full row data in the first column for later retrieval
+                if c_idx == 0:
+                    item.setData(Qt.ItemDataRole.UserRole, row)
+                
+                # Apply color to status column
+                if c_idx == 7:  # STATUS column
+                    bg_color = status_colors.get(status, QColor('#f3f4f6'))
+                    text_color = status_text_colors.get(status, QColor('#111827'))
+                    item.setBackground(QBrush(bg_color))
+                    item.setForeground(QBrush(text_color))
+                
                 self.history_table.setItem(r_idx, c_idx, item)

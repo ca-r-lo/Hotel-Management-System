@@ -16,7 +16,7 @@ class InventoryController:
         
         # Connect action buttons
         self.view.btn_add_stocks.clicked.connect(self.handle_add_stock)
-        self.view.btn_distribute_stocks.clicked.connect(self.handle_stock_requests)
+        self.view.btn_distribute_stocks.clicked.connect(self.handle_distribute_stocks)
         self.view.btn_stock_request.clicked.connect(self.handle_stock_requests)
         self.view.btn_history.clicked.connect(self.handle_history)
         
@@ -177,6 +177,67 @@ class InventoryController:
                 # For Department role, leave the actions column empty
                 empty_widget = QFrame()
                 self.view.table.setCellWidget(r_idx, 4, empty_widget)
+    
+    def handle_distribute_stocks(self):
+        """Handle distributing stocks to departments."""
+        from views.distribute_stocks_dialog import DistributeStocksDialog
+        
+        dlg = DistributeStocksDialog(self.view)
+        dlg.distribute_btn.clicked.connect(lambda: self.process_distribution(dlg))
+        dlg.exec()
+    
+    def process_distribution(self, dialog):
+        """Process the stock distribution."""
+        data = dialog.get_data()
+        department = data.get('department')
+        items = data.get('items', [])
+        
+        if not items:
+            msg = QMessageBox(dialog)
+            msg.setIcon(QMessageBox.Icon.Warning)
+            msg.setWindowTitle("No Items Selected")
+            msg.setText("Please add at least one item to distribute.")
+            msg.setStyleSheet("QLabel { color: #000000; }")
+            msg.exec()
+            return
+        
+        try:
+            from models.purchase import ItemModel
+            from models.database import get_conn, _paramstyle
+            
+            conn = get_conn()
+            cur = conn.cursor()
+            
+            # Create a distribution record and update inventory
+            for item in items:
+                # Deduct from inventory
+                ItemModel.adjust_stock(item['item_id'], -item['quantity'])
+                
+                # Log the distribution (you can create a distributions table for this)
+                # For now, we'll just update the inventory
+                
+            conn.commit()
+            conn.close()
+            
+            msg = QMessageBox(dialog)
+            msg.setIcon(QMessageBox.Icon.Information)
+            msg.setWindowTitle("Success")
+            msg.setText(f"Successfully distributed {len(items)} item(s) to {department}!")
+            msg.setStyleSheet("QLabel { color: #000000; }")
+            msg.exec()
+            
+            dialog.accept()
+            self.refresh_inventory()
+            
+        except Exception as e:
+            msg = QMessageBox(dialog)
+            msg.setIcon(QMessageBox.Icon.Critical)
+            msg.setWindowTitle("Error")
+            msg.setText(f"Failed to distribute stocks:\n{e}")
+            msg.setStyleSheet("QLabel { color: #000000; }")
+            msg.exec()
+            import traceback
+            traceback.print_exc()
     
     def handle_add_stock(self):
         """Handle adding a new inventory item from delivered purchase orders."""

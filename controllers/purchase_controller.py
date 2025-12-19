@@ -1,6 +1,7 @@
 from PyQt6.QtWidgets import QDialog, QTableWidgetItem, QPushButton, QMessageBox
 from PyQt6.QtCore import Qt
 from views.order_stocks import OrderStocksDialog, AddItemDialog
+from views.purchase_detail_dialog import PurchaseDetailDialog
 
 class PurchaseController:
     def __init__(self, view, model, dashboard=None):
@@ -12,7 +13,19 @@ class PurchaseController:
         self.view.btn_suppliers.clicked.connect(self.handle_open_suppliers)
         self.view.btn_track_orders.clicked.connect(self.handle_open_track_orders)
         self.view.btn_report_damages.clicked.connect(self.handle_open_report_damages)
+        # Connect table row click to show details
+        self.view.history_table.cellClicked.connect(self.handle_row_click)
         self.refresh_table()
+    
+    def handle_row_click(self, row, column):
+        """Handle clicking on a row to show purchase order details."""
+        # Get the purchase data from the first column's UserRole data
+        item = self.view.history_table.item(row, 0)
+        if item:
+            purchase_data = item.data(Qt.ItemDataRole.UserRole)
+            if purchase_data:
+                dlg = PurchaseDetailDialog(purchase_data, self.view)
+                dlg.exec()
 
     def handle_open_order_stocks(self):
         """Opens the main Procurement Dialog."""
