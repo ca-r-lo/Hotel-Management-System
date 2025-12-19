@@ -209,12 +209,21 @@ class InventoryController:
             cur = conn.cursor()
             
             # Create a distribution record and update inventory
+            user_name = self.view.current_user if hasattr(self.view, 'current_user') else 'System'
+            
             for item in items:
                 # Deduct from inventory
                 ItemModel.adjust_stock(item['item_id'], -item['quantity'])
                 
-                # Log the distribution (you can create a distributions table for this)
-                # For now, we'll just update the inventory
+                # Log the distribution activity
+                self.log_inventory_activity(
+                    item_name=item['item_name'],
+                    movement_type='distributed',
+                    quantity=item['quantity'],
+                    user_name=user_name,
+                    notes=f"Distributed to {department}",
+                    department=department
+                )
                 
             conn.commit()
             conn.close()
@@ -435,6 +444,17 @@ class InventoryController:
                 conn.commit()
             
             conn.close()
+            
+            # Log the activity
+            user_name = self.view.current_user if hasattr(self.view, 'current_user') else 'Purchase Admin'
+            self.log_inventory_activity(
+                item_name=data['name'],
+                movement_type='stock_in',
+                quantity=qty_to_add,
+                user_name=user_name,
+                notes='Added from purchase order',
+                department=data.get('category')
+            )
             
             msg = QMessageBox(dialog)
             msg.setIcon(QMessageBox.Icon.Information)
@@ -709,37 +729,12 @@ class InventoryController:
         """Handle showing stock history dialog."""
         from views.inventory import StockHistoryDialog
         from datetime import datetime
-        
-        # Create sample history data (you can replace this with actual database queries)
-        # This is mock data - replace with actual history from your database
-        history_data = [
-            {
-                'timestamp': datetime.now().strftime('%Y-%m-%d %I:%M %p'),
-                'item_name': 'Toilet Paper',
-                'type': 'Stock In',
-                'quantity': 100,
-                'user': 'Purchase Admin',
-                'notes': 'New stock delivery'
-            },
-            {
-                'timestamp': datetime.now().strftime('%Y-%m-%d %I:%M %p'),
-                'item_name': 'Soap',
-                'type': 'Stock Out',
-                'quantity': -20,
-                'user': 'Housekeeping Manager',
-                'notes': 'Distributed to Housekeeping'
-            },
-            {
-                'timestamp': datetime.now().strftime('%Y-%m-%d %I:%M %p'),
-                'item_name': 'Towels',
-                'type': 'Adjustment',
-                'quantity': -5,
-                'user': 'System',
-                'notes': 'Damaged items removed'
-            },
-        ]
+        from models.database import get_conn
         
         try:
+            # Fetch real inventory history from database
+            history_data = self.get_inventory_history()
+            
             dialog = StockHistoryDialog(self.view)
             dialog.load_history(history_data)
             dialog.exec()
@@ -750,5 +745,144 @@ class InventoryController:
             msg.setText(f"Failed to load history:\n{e}")
             msg.setStyleSheet("QLabel { color: #000000; }")
             msg.exec()
+            import traceback
+            traceback.print_exc()
+    
+    def get_inventory_history(self):
+        """Fetch inventory history from database."""
+        from models.database import get_conn
+        from datetime import datetime
+        
+        try:
+            conn = get_conn()
+            cur = conn.cursor()
+            
+            # Query to get inventory movements
+            # This includes: items added from purchases, distributions to departments, adjustments
+            sql = """
+                SELECT 
+                    created_at,
+                    item_name,
+                    movement_type,
+                    quantity,
+                    user_name,
+                    notes,
+                    department
+                FROM inventory_history
+                ORDER BY created_at DESC
+                LIMIT 100
+            """
+            
+            cur.execute(sql)
+            rows = cur.fetchall()
+            conn.close()
+            
+            history_data = []
+            for row in rows:
+                try:
+                    row_dict = dict(row)
+                except:
+                    row_dict = {
+                        'created_at': row[0],
+                        'item_name': row[1],
+                        'movement_type': row[2],
+                        'quantity': row[3],
+                        'user_name': row[4],
+                        'notes': row[5],
+                        'department': row[6] if len(row) > 6 else None
+                    }
+                
+                # Format the data for display
+                timestamp = row_dict.get('created_at')
+                if timestamp:
+                    try:
+                        if isinstance(timestamp, str):
+                            dt = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                        else:
+                            dt = timestamp
+                        formatted_time = dt.strftime('%Y-%m-%d %I:%M %p')
+                    except:
+                        formatted_time = str(timestamp)
+                else:
+                    formatted_time = 'Unknown'
+                
+                movement_type = row_dict.get('movement_type', 'Unknown')
+                # Map movement types to display names
+                type_mapping = {
+                    'stock_in': 'Stock In',
+                    'stock_out': 'Stock Out',
+                    'distributed': 'Stock Out',
+                    'adjustment': 'Adjustment',
+                    'damage': 'Adjustment',
+                    'added': 'Stock In'
+                }
+                display_type = type_mapping.get(movement_type.lower(), movement_type)
+                
+                quantity = row_dict.get('quantity', 0)
+                # Add + or - prefix
+                if display_type == 'Stock In':
+                    qty_display = f"+{quantity}"
+                elif display_type == 'Stock Out':
+                    qty_display = f"-{quantity}"
+                else:
+                    qty_display = str(quantity)
+                
+                notes = row_dict.get('notes', '-')
+                department = row_dict.get('department')
+                if department and 'department' not in notes.lower():
+                    notes = f"{notes} ({department})" if notes != '-' else department
+                
+                history_data.append({
+                    'timestamp': formatted_time,
+                    'item_name': row_dict.get('item_name', 'Unknown'),
+                    'type': display_type,
+                    'quantity': qty_display,
+                    'user': row_dict.get('user_name', 'System'),
+                    'notes': notes
+                })
+            
+            return history_data
+            
+        except Exception as e:
+            print(f"Error fetching inventory history: {e}")
+            import traceback
+            traceback.print_exc()
+            # Return empty list if table doesn't exist yet
+            return []
+    
+    @staticmethod
+    def log_inventory_activity(item_name, movement_type, quantity, user_name, notes='', department=None):
+        """Log an inventory activity to the history table."""
+        from models.database import get_conn, _paramstyle
+        from datetime import datetime
+        
+        try:
+            conn = get_conn()
+            cur = conn.cursor()
+            
+            if _paramstyle == 'qmark':
+                sql = """
+                    INSERT INTO inventory_history 
+                    (item_name, movement_type, quantity, user_name, notes, department, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                """
+                cur.execute(sql, (item_name, movement_type, quantity, user_name, notes, department, datetime.now()))
+            else:
+                sql = """
+                    INSERT INTO inventory_history 
+                    (item_name, movement_type, quantity, user_name, notes, department, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """
+                cur.execute(sql, (item_name, movement_type, quantity, user_name, notes, department, datetime.now()))
+            
+            conn.commit()
+            conn.close()
+            return True
+            
+        except Exception as e:
+            print(f"Error logging inventory activity: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
 
 
