@@ -53,9 +53,9 @@ class DepartmentOverviewPage(QWidget):
                 margin-right: 8px;
             }
         """)
-        # Populate with departments
-        departments = ["All Departments", "Housekeeping", "Kitchen", "Front Desk", "Maintenance", "Laundry"]
-        self.dept_selector.addItems(departments)
+        # Departments will be populated by controller
+        # Start with just "All Departments"
+        self.dept_selector.addItem("All Departments")
         selector_layout.addWidget(self.dept_selector)
         
         selector_layout.addStretch()

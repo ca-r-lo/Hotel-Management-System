@@ -156,11 +156,101 @@ def create_tables():
                 );
             """)
             conn.commit()
+            
+            # Add migration for new columns if they don't exist
+            PurchaseModel.migrate_purchase_items_table(conn)
+            
     finally:
         try:
             conn.close()
         except Exception:
             pass
+
+    @staticmethod
+    def migrate_purchase_items_table(conn):
+        """Add missing columns to purchase_items table and handle renames."""
+        try:
+            cur = conn.cursor()
+            
+            # Check if item_id column exists
+            if _paramstyle == 'qmark':  # SQLite
+                cur.execute("PRAGMA table_info(purchase_items)")
+                columns = [row[1] for row in cur.fetchall()]
+                
+                if 'item_name' not in columns:
+                    cur.execute("ALTER TABLE purchase_items ADD COLUMN item_name TEXT")
+                    print("Added item_name column to purchase_items")
+                
+                if 'item_id' not in columns:
+                    cur.execute("ALTER TABLE purchase_items ADD COLUMN item_id INTEGER")
+                    print("Added item_id column to purchase_items")
+                
+                if 'quantity' not in columns and 'qty' in columns:
+                    # SQLite doesn't support RENAME COLUMN in older versions, so we'll just add it
+                    cur.execute("ALTER TABLE purchase_items ADD COLUMN quantity INTEGER DEFAULT 0")
+                    # Copy data from qty to quantity
+                    cur.execute("UPDATE purchase_items SET quantity = qty WHERE quantity IS NULL OR quantity = 0")
+                    print("Added quantity column to purchase_items")
+                elif 'quantity' not in columns:
+                    cur.execute("ALTER TABLE purchase_items ADD COLUMN quantity INTEGER DEFAULT 0")
+                    print("Added quantity column to purchase_items")
+                
+                if 'unit_price' not in columns and 'price' in columns:
+                    cur.execute("ALTER TABLE purchase_items ADD COLUMN unit_price REAL DEFAULT 0")
+                    cur.execute("UPDATE purchase_items SET unit_price = price WHERE unit_price IS NULL OR unit_price = 0")
+                    print("Added unit_price column to purchase_items")
+                elif 'unit_price' not in columns:
+                    cur.execute("ALTER TABLE purchase_items ADD COLUMN unit_price REAL DEFAULT 0")
+                    print("Added unit_price column to purchase_items")
+                
+                if 'in_inventory' not in columns:
+                    cur.execute("ALTER TABLE purchase_items ADD COLUMN in_inventory INTEGER DEFAULT 0")
+                    print("Added in_inventory column to purchase_items")
+                    
+            else:  # MySQL
+                cur.execute("""
+                    SELECT COLUMN_NAME 
+                    FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE() 
+                    AND TABLE_NAME = 'purchase_items'
+                """)
+                columns = [row[0] for row in cur.fetchall()]
+                
+                if 'item_name' not in columns:
+                    cur.execute("ALTER TABLE purchase_items ADD COLUMN item_name VARCHAR(255)")
+                    print("Added item_name column to purchase_items")
+                
+                if 'item_id' not in columns:
+                    cur.execute("ALTER TABLE purchase_items ADD COLUMN item_id INT")
+                    print("Added item_id column to purchase_items")
+                
+                if 'quantity' not in columns and 'qty' in columns:
+                    cur.execute("ALTER TABLE purchase_items ADD COLUMN quantity INT DEFAULT 0")
+                    cur.execute("UPDATE purchase_items SET quantity = qty WHERE quantity IS NULL OR quantity = 0")
+                    print("Added quantity column to purchase_items")
+                elif 'quantity' not in columns:
+                    cur.execute("ALTER TABLE purchase_items ADD COLUMN quantity INT DEFAULT 0")
+                    print("Added quantity column to purchase_items")
+                
+                if 'unit_price' not in columns and 'price' in columns:
+                    cur.execute("ALTER TABLE purchase_items ADD COLUMN unit_price DECIMAL(12,2) DEFAULT 0")
+                    cur.execute("UPDATE purchase_items SET unit_price = price WHERE unit_price IS NULL OR unit_price = 0")
+                    print("Added unit_price column to purchase_items")
+                elif 'unit_price' not in columns:
+                    cur.execute("ALTER TABLE purchase_items ADD COLUMN unit_price DECIMAL(12,2) DEFAULT 0")
+                    print("Added unit_price column to purchase_items")
+                
+                if 'in_inventory' not in columns:
+                    cur.execute("ALTER TABLE purchase_items ADD COLUMN in_inventory TINYINT DEFAULT 0")
+                    print("Added in_inventory column to purchase_items")
+            
+            conn.commit()
+            
+        except Exception as e:
+            print(f"Migration warning: {e}")
+            import traceback
+            traceback.print_exc()
+            # Don't fail if migration has issues
 
 
 class SupplierModel:
@@ -391,10 +481,23 @@ class PurchaseModel:
                 except Exception:
                     purchase_id = None
 
-            # insert items
+            # insert items - also store item_name for easy querying
             for it in items:
-                _exec(conn, f"INSERT INTO purchase_items (purchase_id, item_id, quantity, unit_price, total) VALUES ({param},{param},{param},{param},{param})",
-                      (purchase_id, it.get('item_id'), it.get('quantity'), it.get('unit_price'), float(it.get('quantity',0)) * float(it.get('unit_price',0))))
+                # Get item name from items table
+                item_name = None
+                item_id = it.get('item_id')
+                if item_id:
+                    try:
+                        name_cur = conn.cursor()
+                        name_cur.execute(f"SELECT name FROM items WHERE id = {param}", (item_id,))
+                        name_row = name_cur.fetchone()
+                        if name_row:
+                            item_name = name_row[0]
+                    except Exception:
+                        pass
+                
+                _exec(conn, f"INSERT INTO purchase_items (purchase_id, item_id, item_name, quantity, unit_price, total) VALUES ({param},{param},{param},{param},{param},{param})",
+                      (purchase_id, item_id, item_name, it.get('quantity'), it.get('unit_price'), float(it.get('quantity',0)) * float(it.get('unit_price',0))))
             conn.commit()
             return purchase_id
         except Exception as e:

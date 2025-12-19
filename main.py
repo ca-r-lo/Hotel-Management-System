@@ -8,11 +8,19 @@ from views.dashboard import DashboardWindow
 
 from controllers.login import LoginController
 from models.user import UserModel
+from models.purchase import PurchaseModel
 
 from configs.config import DB_CONFIG
 
 
 def main():
+    # Run database migrations
+    try:
+        PurchaseModel.init_tables()
+        print("Database migrations completed successfully")
+    except Exception as e:
+        print(f"Warning: Migration error - {e}")
+    
     app = QApplication(sys.argv)
 
     icon_pixmap = QPixmap("assets/logo_taskbar.png")

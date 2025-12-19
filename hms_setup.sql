@@ -80,7 +80,7 @@ CREATE TABLE IF NOT EXISTS purchase_items (
     purchase_id INT NOT NULL,
     item_name VARCHAR(255),
     item_id INT,
-    qty INT NOT NULL,
+    quantity INT NOT NULL,
     price DECIMAL(12,2) NOT NULL,
     total DECIMAL(12,2) NOT NULL,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,

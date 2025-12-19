@@ -1,5 +1,9 @@
-from PyQt6.QtWidgets import QMessageBox, QFileDialog
-from PyQt6.QtCore import QDate
+from PyQt6.QtWidgets import (
+    QMessageBox, QFileDialog, QDialog, QVBoxLayout, QHBoxLayout, 
+    QComboBox, QLabel, QPushButton, QTableWidget, QTableWidgetItem, QHeaderView
+)
+from PyQt6.QtCore import QDate, Qt
+from PyQt6.QtGui import QFont
 from views.reports import GenerateReportDialog, ViewReportDialog
 from models.purchase import PurchaseModel, ItemModel, DamageModel
 from datetime import datetime, timedelta
@@ -20,7 +24,7 @@ class ReportsController:
         
         # Connect action buttons - updated button names
         self.view.btn_view_reports.clicked.connect(self.handle_stock_levels)
-        self.view.btn_generate_reports.clicked.connect(self.handle_usage_history)
+        self.view.btn_generate_reports.clicked.connect(self.handle_view_reports)
         self.view.btn_summary.clicked.connect(self.handle_low_stock_alert)
         self.view.btn_export.clicked.connect(self.handle_export_report)
         
@@ -136,26 +140,453 @@ class ReportsController:
         """)
         msg.exec()
     
-    def handle_usage_history(self):
-        """Show usage history report."""
-        msg = QMessageBox(self.view)
-        msg.setIcon(QMessageBox.Icon.Information)
-        msg.setWindowTitle("Usage History")
-        msg.setText("Usage history reporting coming soon!")
-        msg.setStyleSheet("""
-            QMessageBox { background-color: white; }
-            QLabel { color: #111827; font-size: 13px; }
-            QPushButton { 
-                background-color: #0056b3; 
-                color: white; 
-                border: none; 
-                padding: 8px 20px; 
+    def handle_view_reports(self):
+        """Show report preview dialog with report type selection."""
+        # Create dialog
+        dialog = QDialog(self.view)
+        dialog.setWindowTitle("VIEW REPORTS")
+        dialog.setMinimumSize(900, 600)
+        dialog.setStyleSheet("QDialog { background-color: white; }")
+        
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(20)
+        
+        # Title
+        title = QLabel("VIEW REPORTS")
+        title.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("color: #111827; padding-bottom: 10px; border-bottom: 2px solid #d1d5db;")
+        layout.addWidget(title)
+        
+        # Report type selector
+        selector_layout = QHBoxLayout()
+        selector_label = QLabel("SELECT REPORT TYPE:")
+        selector_label.setStyleSheet("color: #111827; font-weight: bold; font-size: 13px;")
+        selector_layout.addWidget(selector_label)
+        
+        report_type_cb = QComboBox()
+        report_type_cb.addItems([
+            "Stock Summary",
+            "Usage Data",
+            "Purchasing Trends",
+            "Low Stock Alert",
+            "Damage Reports",
+            "Supplier Performance"
+        ])
+        report_type_cb.setFixedHeight(35)
+        report_type_cb.setStyleSheet("""
+            QComboBox {
+                border: 2px solid #d1d5db;
+                border-radius: 4px;
+                padding: 5px 10px;
+                background-color: white;
+                color: #111827;
+                font-size: 13px;
+            }
+            QComboBox:hover { border-color: #0056b3; }
+            QComboBox QAbstractItemView {
+                background-color: white;
+                color: #111827;
+                selection-background-color: #f9fafb;
+                selection-color: #111827;
+            }
+        """)
+        selector_layout.addWidget(report_type_cb, 1)
+        layout.addLayout(selector_layout)
+        
+        # Preview table
+        preview_table = QTableWidget()
+        preview_table.setStyleSheet("""
+            QTableWidget {
+                background-color: white;
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
+                color: #111827;
+            }
+            QTableWidget::item {
+                padding: 8px;
+                color: #111827;
+            }
+            QHeaderView::section {
+                background-color: #f9fafb;
+                color: #111827;
+                font-weight: bold;
+                padding: 10px;
+                border: none;
+                border-bottom: 2px solid #d1d5db;
+            }
+        """)
+        layout.addWidget(preview_table)
+        
+        # Function to load report preview
+        def load_report_preview():
+            report_type = report_type_cb.currentText()
+            
+            try:
+                if report_type == "Stock Summary":
+                    self.load_stock_summary_preview(preview_table)
+                elif report_type == "Usage Data":
+                    self.load_usage_data_preview(preview_table)
+                elif report_type == "Purchasing Trends":
+                    self.load_purchasing_trends_preview(preview_table)
+                elif report_type == "Low Stock Alert":
+                    self.load_low_stock_preview(preview_table)
+                elif report_type == "Damage Reports":
+                    self.load_damage_reports_preview(preview_table)
+                elif report_type == "Supplier Performance":
+                    self.load_supplier_performance_preview(preview_table)
+            except Exception as e:
+                print(f"Error loading report preview: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # Connect combo box change
+        report_type_cb.currentTextChanged.connect(lambda: load_report_preview())
+        
+        # Close button
+        close_btn = QPushButton("CLOSE")
+        close_btn.setFixedHeight(40)
+        close_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #0056b3;
+                color: white;
+                border: none;
                 border-radius: 4px;
                 font-weight: bold;
+                font-size: 13px;
             }
-            QPushButton:hover { background-color: #003d82; }
+            QPushButton:hover {
+                background-color: #004494;
+            }
         """)
-        msg.exec()
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn)
+        
+        # Load initial preview
+        load_report_preview()
+        
+        dialog.exec()
+    
+    def load_stock_summary_preview(self, table):
+        """Load stock summary report preview."""
+        try:
+            item_model = ItemModel()
+            items = item_model.list_items()
+            
+            # Filter by department if Department role
+            if self.view.current_role == "Department" and self.view.current_department:
+                items = [item for item in items 
+                        if item.get('category', '').lower() == self.view.current_department.lower()]
+            
+            # Group by category
+            category_stats = {}
+            for item in items:
+                category = item.get('category') or "Uncategorized"
+                if category not in category_stats:
+                    category_stats[category] = {'count': 0, 'value': 0, 'qty': 0}
+                category_stats[category]['count'] += 1
+                category_stats[category]['value'] += (item.get('stock_qty', 0) * item.get('unit_cost', 0))
+                category_stats[category]['qty'] += item.get('stock_qty', 0)
+            
+            # Set up table
+            headers = ['CATEGORY', 'ITEMS COUNT', 'TOTAL QUANTITY', 'TOTAL VALUE']
+            table.setColumnCount(len(headers))
+            table.setHorizontalHeaderLabels(headers)
+            table.setRowCount(len(category_stats))
+            
+            # Populate table
+            for row_idx, (cat, stats) in enumerate(category_stats.items()):
+                table.setItem(row_idx, 0, QTableWidgetItem(cat))
+                table.setItem(row_idx, 1, QTableWidgetItem(str(stats['count'])))
+                table.setItem(row_idx, 2, QTableWidgetItem(str(stats['qty'])))
+                table.setItem(row_idx, 3, QTableWidgetItem(f"₱{stats['value']:,.2f}"))
+                
+                for col in range(4):
+                    item = table.item(row_idx, col)
+                    if item:
+                        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            
+            table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+            
+        except Exception as e:
+            print(f"Error loading stock summary preview: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def load_usage_data_preview(self, table):
+        """Load usage data report preview."""
+        try:
+            # Get purchases from the last 30 days
+            from datetime import datetime, timedelta
+            purchases = PurchaseModel.list_purchases()
+            
+            # Filter recent purchases
+            thirty_days_ago = datetime.now() - timedelta(days=30)
+            recent_purchases = []
+            for p in purchases:
+                created_at = p.get('created_at')
+                if created_at and isinstance(created_at, str):
+                    try:
+                        purchase_date = datetime.strptime(created_at[:10], '%Y-%m-%d')
+                        if purchase_date >= thirty_days_ago:
+                            recent_purchases.append(p)
+                    except:
+                        pass
+                elif isinstance(created_at, datetime):
+                    if created_at >= thirty_days_ago:
+                        recent_purchases.append(p)
+            
+            # Set up table
+            headers = ['ORDER ID', 'DATE', 'SUPPLIER', 'ITEMS', 'TOTAL AMOUNT', 'STATUS']
+            table.setColumnCount(len(headers))
+            table.setHorizontalHeaderLabels(headers)
+            table.setRowCount(min(len(recent_purchases), 20))  # Show max 20
+            
+            # Populate table
+            for row_idx, purchase in enumerate(recent_purchases[:20]):
+                order_id = f"#{purchase.get('id', 0):04d}"
+                date_str = str(purchase.get('created_at', ''))[:10] if purchase.get('created_at') else 'N/A'
+                supplier = purchase.get('supplier_name', 'N/A')
+                items_count = str(purchase.get('items_count', 0)) + ' items'
+                total = f"₱{float(purchase.get('total_amount', 0)):,.2f}"
+                status = str(purchase.get('status', 'PENDING')).upper()
+                
+                table.setItem(row_idx, 0, QTableWidgetItem(order_id))
+                table.setItem(row_idx, 1, QTableWidgetItem(date_str))
+                table.setItem(row_idx, 2, QTableWidgetItem(supplier))
+                table.setItem(row_idx, 3, QTableWidgetItem(items_count))
+                table.setItem(row_idx, 4, QTableWidgetItem(total))
+                table.setItem(row_idx, 5, QTableWidgetItem(status))
+                
+                for col in range(6):
+                    item = table.item(row_idx, col)
+                    if item:
+                        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            
+            table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+            
+        except Exception as e:
+            print(f"Error loading usage data preview: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def load_purchasing_trends_preview(self, table):
+        """Load purchasing trends report preview."""
+        try:
+            purchases = PurchaseModel.list_purchases()
+            
+            # Group by month
+            from datetime import datetime
+            from collections import defaultdict
+            
+            monthly_stats = defaultdict(lambda: {'count': 0, 'total': 0})
+            
+            for p in purchases:
+                created_at = p.get('created_at')
+                if created_at:
+                    if isinstance(created_at, str):
+                        try:
+                            month_key = created_at[:7]  # YYYY-MM
+                        except:
+                            continue
+                    elif isinstance(created_at, datetime):
+                        month_key = created_at.strftime('%Y-%m')
+                    else:
+                        continue
+                    
+                    monthly_stats[month_key]['count'] += 1
+                    monthly_stats[month_key]['total'] += float(p.get('total_amount', 0))
+            
+            # Sort by month
+            sorted_months = sorted(monthly_stats.items(), reverse=True)[:12]  # Last 12 months
+            
+            # Set up table
+            headers = ['MONTH', 'ORDERS COUNT', 'TOTAL AMOUNT', 'AVG ORDER VALUE']
+            table.setColumnCount(len(headers))
+            table.setHorizontalHeaderLabels(headers)
+            table.setRowCount(len(sorted_months))
+            
+            # Populate table
+            for row_idx, (month, stats) in enumerate(sorted_months):
+                avg_value = stats['total'] / stats['count'] if stats['count'] > 0 else 0
+                
+                table.setItem(row_idx, 0, QTableWidgetItem(month))
+                table.setItem(row_idx, 1, QTableWidgetItem(str(stats['count'])))
+                table.setItem(row_idx, 2, QTableWidgetItem(f"₱{stats['total']:,.2f}"))
+                table.setItem(row_idx, 3, QTableWidgetItem(f"₱{avg_value:,.2f}"))
+                
+                for col in range(4):
+                    item = table.item(row_idx, col)
+                    if item:
+                        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            
+            table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+            
+        except Exception as e:
+            print(f"Error loading purchasing trends preview: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def load_low_stock_preview(self, table):
+        """Load low stock alert report preview."""
+        try:
+            item_model = ItemModel()
+            items = item_model.list_items()
+            
+            # Filter by department if Department role
+            if self.view.current_role == "Department" and self.view.current_department:
+                items = [item for item in items 
+                        if item.get('category', '').lower() == self.view.current_department.lower()]
+            
+            # Find low stock items
+            low_stock_items = [item for item in items 
+                             if item.get('stock_qty', 0) <= item.get('min_stock', 0)]
+            
+            # Set up table
+            headers = ['ITEM NAME', 'CATEGORY', 'CURRENT STOCK', 'MIN STOCK', 'SHORTAGE', 'STATUS']
+            table.setColumnCount(len(headers))
+            table.setHorizontalHeaderLabels(headers)
+            table.setRowCount(len(low_stock_items))
+            
+            # Populate table
+            for row_idx, item in enumerate(low_stock_items):
+                name = item.get('name', 'Unknown')
+                category = item.get('category', 'General')
+                current_stock = item.get('stock_qty', 0)
+                min_stock = item.get('min_stock', 0)
+                shortage = max(0, min_stock - current_stock)
+                
+                if current_stock == 0:
+                    status = "OUT OF STOCK"
+                elif current_stock <= min_stock * 0.5:
+                    status = "CRITICAL"
+                else:
+                    status = "LOW"
+                
+                table.setItem(row_idx, 0, QTableWidgetItem(name))
+                table.setItem(row_idx, 1, QTableWidgetItem(category))
+                table.setItem(row_idx, 2, QTableWidgetItem(str(current_stock)))
+                table.setItem(row_idx, 3, QTableWidgetItem(str(min_stock)))
+                table.setItem(row_idx, 4, QTableWidgetItem(str(shortage)))
+                table.setItem(row_idx, 5, QTableWidgetItem(status))
+                
+                for col in range(6):
+                    item_widget = table.item(row_idx, col)
+                    if item_widget:
+                        item_widget.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            
+            table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+            
+        except Exception as e:
+            print(f"Error loading low stock preview: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def load_damage_reports_preview(self, table):
+        """Load damage reports preview."""
+        try:
+            damages = DamageModel.list_damages()
+            
+            # Set up table
+            headers = ['DATE', 'ITEM', 'QUANTITY', 'CATEGORY', 'REASON', 'REPORTED BY']
+            table.setColumnCount(len(headers))
+            table.setHorizontalHeaderLabels(headers)
+            table.setRowCount(min(len(damages), 20))  # Show max 20
+            
+            # Populate table
+            for row_idx, damage in enumerate(damages[:20]):
+                date_str = str(damage.get('created_at', ''))[:10] if damage.get('created_at') else 'N/A'
+                
+                # Get item name (would need to join with items table)
+                item_name = f"Item #{damage.get('item_id', 'N/A')}"
+                quantity = str(damage.get('quantity', 0))
+                category = damage.get('category', 'N/A')
+                reason = damage.get('reason', 'N/A')
+                reported_by = damage.get('created_by', 'N/A')
+                
+                table.setItem(row_idx, 0, QTableWidgetItem(date_str))
+                table.setItem(row_idx, 1, QTableWidgetItem(item_name))
+                table.setItem(row_idx, 2, QTableWidgetItem(quantity))
+                table.setItem(row_idx, 3, QTableWidgetItem(category))
+                table.setItem(row_idx, 4, QTableWidgetItem(reason))
+                table.setItem(row_idx, 5, QTableWidgetItem(reported_by))
+                
+                for col in range(6):
+                    item = table.item(row_idx, col)
+                    if item:
+                        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            
+            table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+            
+        except Exception as e:
+            print(f"Error loading damage reports preview: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def load_supplier_performance_preview(self, table):
+        """Load supplier performance report preview."""
+        try:
+            from models.purchase import SupplierModel
+            suppliers = SupplierModel.list_suppliers()
+            purchases = PurchaseModel.list_purchases()
+            
+            # Calculate stats per supplier
+            supplier_stats = {}
+            for supplier in suppliers:
+                supplier_id = supplier.get('id')
+                supplier_stats[supplier_id] = {
+                    'name': supplier.get('name', 'Unknown'),
+                    'orders': 0,
+                    'total_amount': 0,
+                    'completed': 0,
+                    'pending': 0
+                }
+            
+            for purchase in purchases:
+                supplier_id = purchase.get('supplier_id')
+                if supplier_id in supplier_stats:
+                    supplier_stats[supplier_id]['orders'] += 1
+                    supplier_stats[supplier_id]['total_amount'] += float(purchase.get('total_amount', 0))
+                    
+                    status = purchase.get('status', '').lower()
+                    if status in ['completed', 'received']:
+                        supplier_stats[supplier_id]['completed'] += 1
+                    elif status == 'pending':
+                        supplier_stats[supplier_id]['pending'] += 1
+            
+            # Set up table
+            headers = ['SUPPLIER', 'TOTAL ORDERS', 'TOTAL AMOUNT', 'COMPLETED', 'PENDING', 'COMPLETION RATE']
+            table.setColumnCount(len(headers))
+            table.setHorizontalHeaderLabels(headers)
+            table.setRowCount(len(supplier_stats))
+            
+            # Populate table
+            for row_idx, (supplier_id, stats) in enumerate(supplier_stats.items()):
+                completion_rate = (stats['completed'] / stats['orders'] * 100) if stats['orders'] > 0 else 0
+                
+                table.setItem(row_idx, 0, QTableWidgetItem(stats['name']))
+                table.setItem(row_idx, 1, QTableWidgetItem(str(stats['orders'])))
+                table.setItem(row_idx, 2, QTableWidgetItem(f"₱{stats['total_amount']:,.2f}"))
+                table.setItem(row_idx, 3, QTableWidgetItem(str(stats['completed'])))
+                table.setItem(row_idx, 4, QTableWidgetItem(str(stats['pending'])))
+                table.setItem(row_idx, 5, QTableWidgetItem(f"{completion_rate:.1f}%"))
+                
+                for col in range(6):
+                    item = table.item(row_idx, col)
+                    if item:
+                        item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            
+            table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+            
+        except Exception as e:
+            print(f"Error loading supplier performance preview: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def handle_usage_history(self):
+        """Show usage history report - kept for backwards compatibility."""
+        self.handle_view_reports()
     
     def handle_low_stock_alert(self):
         """Show low stock alert report."""

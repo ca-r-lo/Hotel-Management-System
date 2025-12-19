@@ -113,7 +113,7 @@ class PurchasePage(QWidget):
             supplier_name = row.get('supplier_name', 'N/A') if row.get('supplier_name') else 'N/A'
             supplier_contact = row.get('supplier_contact', '-') if row.get('supplier_contact') else '-'
             expected_date = str(row.get('expected_date', ''))[:10] if row.get('expected_date') else 'N/A'
-            item_count = str(row.get('item_count', 0)) + ' items'
+            item_count = str(row.get('items_count', 0)) + ' items'
             total = f"₱ {float(row.get('total_amount', 0)):,.2f}"
             status = str(row.get('status', 'PENDING')).upper()
             created_by = row.get('created_by', 'N/A') if row.get('created_by') else 'N/A'

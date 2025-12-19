@@ -12,6 +12,7 @@ class InventoryController:
         self.view = view
         self.model = model
         self.current_category_filter = "All Categories"
+        self.current_dept_filter = "All Departments"
         
         # Connect action buttons
         self.view.btn_add_stocks.clicked.connect(self.handle_add_stock)
@@ -21,6 +22,7 @@ class InventoryController:
         
         # Connect filters
         self.view.category_filter.currentTextChanged.connect(self.handle_category_filter_change)
+        self.view.dept_filter.currentTextChanged.connect(self.handle_dept_filter_change)
         
         # Load initial data
         self.refresh_inventory()
@@ -30,20 +32,43 @@ class InventoryController:
         self.current_category_filter = filter_value
         self.refresh_inventory()
     
+    def handle_dept_filter_change(self, filter_value):
+        """Handle department filter change."""
+        self.current_dept_filter = filter_value
+        # When department changes, reset category to "All Categories"
+        # unless we're filtering by a specific department
+        if filter_value != "All Departments":
+            # Department filter takes precedence over category filter
+            # Show items from this department regardless of category
+            self.current_category_filter = "All Categories"
+            if self.view.category_filter.currentText() != "All Categories":
+                self.view.category_filter.blockSignals(True)
+                self.view.category_filter.setCurrentText("All Categories")
+                self.view.category_filter.blockSignals(False)
+        self.refresh_inventory()
+    
     def refresh_inventory(self):
         """Reload inventory items from database and populate table."""
         try:
             # Get all items
             all_items = ItemModel.list_items()
             
-            # Filter by category if not "All Categories"
-            if self.current_category_filter != "All Categories":
+            # Apply filters
+            filtered_items = all_items
+            
+            # First apply department filter if set
+            if self.current_dept_filter != "All Departments":
                 filtered_items = [
-                    item for item in all_items 
+                    item for item in filtered_items 
+                    if item.get('category', '').lower() == self.current_dept_filter.lower()
+                ]
+            
+            # Then apply category filter if set (and dept filter is "All Departments")
+            elif self.current_category_filter != "All Categories":
+                filtered_items = [
+                    item for item in filtered_items 
                     if item.get('category', '').lower() == self.current_category_filter.lower()
                 ]
-            else:
-                filtered_items = all_items
             
             self.populate_table(filtered_items)
         except Exception as e:
@@ -154,10 +179,81 @@ class InventoryController:
                 self.view.table.setCellWidget(r_idx, 4, empty_widget)
     
     def handle_add_stock(self):
-        """Handle adding a new inventory item."""
+        """Handle adding a new inventory item from delivered purchase orders."""
         dlg = AddStockDialog(self.view)
+        
+        # Populate the item selector with delivered purchase order items
+        self.populate_delivered_items(dlg)
+        
         dlg.save_btn.clicked.connect(lambda: self.save_item(dlg))
         dlg.exec()
+    
+    def populate_delivered_items(self, dialog):
+        """Populate the item selector with items from delivered purchase orders."""
+        try:
+            from models.purchase import PurchaseModel
+            from models.database import get_conn, _paramstyle
+            
+            # Get delivered/received purchase orders and their items
+            conn = get_conn()
+            cur = conn.cursor()
+            
+            # Query to get items from delivered purchase orders
+            sql = f"""
+                SELECT 
+                    pi.id as purchase_item_id,
+                    pi.item_id,
+                    COALESCE(pi.item_name, i.name) as item_name,
+                    pi.quantity as qty,
+                    pi.unit_price,
+                    p.id as purchase_id,
+                    i.category,
+                    i.unit
+                FROM purchase_items pi
+                JOIN purchases p ON pi.purchase_id = p.id
+                LEFT JOIN items i ON pi.item_id = i.id
+                WHERE p.status IN ('received', 'delivered', 'completed')
+                AND COALESCE(pi.in_inventory, 0) = 0
+                ORDER BY p.created_at DESC, COALESCE(pi.item_name, i.name)
+            """
+            cur.execute(sql)
+            rows = cur.fetchall()
+            
+            dialog.item_selector.clear()
+            dialog.item_selector.addItem("-- Select Item from Delivered Orders --", None)
+            
+            for row in rows:
+                try:
+                    row_dict = dict(row)
+                except:
+                    row_dict = {
+                        'purchase_item_id': row[0],
+                        'item_id': row[1],
+                        'item_name': row[2],
+                        'qty': row[3],
+                        'unit_price': row[4],
+                        'purchase_id': row[5],
+                        'category': row[6] if len(row) > 6 else 'General',
+                        'unit': row[7] if len(row) > 7 else 'pcs'
+                    }
+                
+                # Create display text
+                item_name = row_dict.get('item_name', 'Unknown')
+                qty = row_dict.get('qty', 0)
+                purchase_id = row_dict.get('purchase_id', 0)
+                display_text = f"{item_name} - Order #{purchase_id:04d} (Qty: {qty})"
+                
+                # Add to combo box with data
+                dialog.item_selector.addItem(display_text, row_dict)
+            
+            conn.close()
+            
+        except Exception as e:
+            print(f"Error loading delivered items: {e}")
+            import traceback
+            traceback.print_exc()
+            # Add a default message if query fails
+            dialog.item_selector.addItem("No delivered items found", None)
     
     def handle_edit_item(self, item):
         """Handle editing an existing inventory item."""
@@ -166,54 +262,93 @@ class InventoryController:
         dlg.exec()
     
     def save_item(self, dialog):
-        """Save a new inventory item to database."""
+        """Save a new inventory item to database from delivered purchase order."""
         data = dialog.get_data()
         
-        # Validate
-        if not data['name']:
+        # Validate - check if item was selected
+        if not data.get('name') or data.get('name') == '-- Select Item from Delivered Orders --':
             msg = QMessageBox(dialog)
             msg.setIcon(QMessageBox.Icon.Warning)
             msg.setWindowTitle("Validation Error")
-            msg.setText("Please enter an item name.")
+            msg.setText("Please select an item from delivered orders.")
             msg.setStyleSheet("QLabel { color: #000000; }")
             msg.exec()
             return
         
-        if not data['unit']:
+        if data.get('stock_qty', 0) <= 0:
             msg = QMessageBox(dialog)
             msg.setIcon(QMessageBox.Icon.Warning)
             msg.setWindowTitle("Validation Error")
-            msg.setText("Please enter a unit.")
+            msg.setText("Please enter a valid quantity.")
             msg.setStyleSheet("QLabel { color: #000000; }")
             msg.exec()
             return
         
         try:
-            result = ItemModel.add_item(
-                name=data['name'],
-                category=data['category'],
-                unit=data['unit'],
-                unit_cost=data['unit_cost'],
-                stock_qty=data['stock_qty'],
-                min_stock=data['min_stock']
-            )
+            from models.database import get_conn, _paramstyle
+            conn = get_conn()
+            cur = conn.cursor()
             
-            if result:
-                msg = QMessageBox(dialog)
-                msg.setIcon(QMessageBox.Icon.Information)
-                msg.setWindowTitle("Success")
-                msg.setText("Item added successfully!")
-                msg.setStyleSheet("QLabel { color: #000000; }")
-                msg.exec()
-                dialog.accept()
-                self.refresh_inventory()
+            # Check if item_id already exists in inventory
+            item_id = data.get('item_id')
+            
+            if item_id:
+                # Item exists - update the quantity
+                if _paramstyle == 'qmark':
+                    sql = """
+                        UPDATE items 
+                        SET stock_qty = stock_qty + ?
+                        WHERE id = ?
+                    """
+                    cur.execute(sql, (data['stock_qty'], item_id))
+                else:
+                    sql = """
+                        UPDATE items 
+                        SET stock_qty = stock_qty + %s
+                        WHERE id = %s
+                    """
+                    cur.execute(sql, (data['stock_qty'], item_id))
+                
+                conn.commit()
+                success_msg = f"Added {data['stock_qty']} units to existing item!"
             else:
-                msg = QMessageBox(dialog)
-                msg.setIcon(QMessageBox.Icon.Warning)
-                msg.setWindowTitle("Error")
-                msg.setText("Failed to add item.")
-                msg.setStyleSheet("QLabel { color: #000000; }")
-                msg.exec()
+                # Item doesn't exist yet - create new entry
+                result = ItemModel.add_item(
+                    name=data['name'],
+                    category=data['category'],
+                    unit=data['unit'],
+                    unit_cost=data['unit_cost'],
+                    stock_qty=data['stock_qty'],
+                    min_stock=data.get('min_stock', 10)
+                )
+                
+                if not result:
+                    raise Exception("Failed to create new inventory item")
+                
+                success_msg = "Item added to inventory successfully!"
+            
+            # Mark the purchase item as added to inventory (optional tracking)
+            purchase_item_id = data.get('purchase_item_id')
+            if purchase_item_id:
+                if _paramstyle == 'qmark':
+                    sql = "UPDATE purchase_items SET in_inventory = 1 WHERE id = ?"
+                    cur.execute(sql, (purchase_item_id,))
+                else:
+                    sql = "UPDATE purchase_items SET in_inventory = %s WHERE id = %s"
+                    cur.execute(sql, (1, purchase_item_id))
+                conn.commit()
+            
+            conn.close()
+            
+            msg = QMessageBox(dialog)
+            msg.setIcon(QMessageBox.Icon.Information)
+            msg.setWindowTitle("Success")
+            msg.setText(success_msg)
+            msg.setStyleSheet("QLabel { color: #000000; }")
+            msg.exec()
+            dialog.accept()
+            self.refresh_inventory()
+            
         except Exception as e:
             msg = QMessageBox(dialog)
             msg.setIcon(QMessageBox.Icon.Critical)
@@ -221,6 +356,8 @@ class InventoryController:
             msg.setText(f"Failed to add item:\n{e}")
             msg.setStyleSheet("QLabel { color: #000000; }")
             msg.exec()
+            import traceback
+            traceback.print_exc()
     
     def update_item(self, item_id, dialog):
         """Update an existing inventory item in database."""

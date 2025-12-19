@@ -139,55 +139,103 @@ class AddStockDialog(QDialog):
         form_layout = QVBoxLayout()
         form_layout.setSpacing(15)
 
-        # Item Name
-        name_label = QLabel("ITEM NAME:")
-        name_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold;")
-        form_layout.addWidget(name_label)
+        if self.is_edit_mode:
+            # Edit mode: Show existing item name (read-only) and allow editing other fields
+            name_label = QLabel("ITEM NAME:")
+            name_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold;")
+            form_layout.addWidget(name_label)
+            
+            self.name_edit = QLineEdit()
+            self.name_edit.setMinimumHeight(35)
+            self.name_edit.setReadOnly(True)
+            self.name_edit.setStyleSheet(f"""
+                QLineEdit {{
+                    border: 2px solid {STYLE_BORDER};
+                    border-radius: 4px;
+                    padding: 5px 10px;
+                    background-color: #f9fafb;
+                    color: #6b7280;
+                }}
+            """)
+            self.name_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            form_layout.addWidget(self.name_edit)
+        else:
+            # Add mode: Select from delivered purchase order items
+            item_label = QLabel("SELECT ITEM FROM DELIVERED ORDERS:")
+            item_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold;")
+            form_layout.addWidget(item_label)
+            
+            self.item_selector = QComboBox()
+            self.item_selector.setMinimumHeight(35)
+            self.item_selector.setStyleSheet(f"""
+                QComboBox {{
+                    border: 2px solid {STYLE_BORDER};
+                    border-radius: 4px;
+                    padding: 5px 10px;
+                    background-color: white;
+                    color: {STYLE_NAVY};
+                }}
+                QComboBox:hover {{ border-color: {STYLE_BLUE}; }}
+                QComboBox QAbstractItemView {{
+                    background-color: white;
+                    color: {STYLE_NAVY};
+                    selection-background-color: {STYLE_BG_LIGHT};
+                    selection-color: {STYLE_NAVY};
+                }}
+            """)
+            self.item_selector.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            # Will be populated by controller with delivered items
+            self.item_selector.currentIndexChanged.connect(self.on_item_selected)
+            form_layout.addWidget(self.item_selector)
+
+        # Category (read-only, auto-filled)
+        category_label = QLabel("DEPARTMENT:")
+        category_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold;")
+        form_layout.addWidget(category_label)
         
-        self.name_edit = QLineEdit()
-        self.name_edit.setMinimumHeight(35)
-        self.name_edit.setPlaceholderText("Enter item name")
-        self.name_edit.setStyleSheet(f"""
+        self.category_display = QLineEdit()
+        self.category_display.setMinimumHeight(35)
+        self.category_display.setReadOnly(True)
+        self.category_display.setStyleSheet(f"""
             QLineEdit {{
                 border: 2px solid {STYLE_BORDER};
                 border-radius: 4px;
                 padding: 5px 10px;
-                background-color: white;
-                color: {STYLE_NAVY};
+                background-color: #f9fafb;
+                color: #6b7280;
             }}
-            QLineEdit:focus {{ border-color: {STYLE_BLUE}; }}
         """)
-        self.name_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        form_layout.addWidget(self.name_edit)
+        self.category_display.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        form_layout.addWidget(self.category_display)
 
-        # Category
-        category_label = QLabel("CATEGORY:")
-        category_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold;")
-        form_layout.addWidget(category_label)
-        
+        # Hidden category combo (for edit mode backward compatibility)
         self.category_cb = QComboBox()
-        self.category_cb.addItems(["General", "Room Supplies", "Kitchen", "Cleaning", "Toiletries", "Other"])
-        self.category_cb.setMinimumHeight(35)
-        self.category_cb.setStyleSheet(f"""
-            QComboBox {{
-                border: 2px solid {STYLE_BORDER};
-                border-radius: 4px;
-                padding: 5px 10px;
-                background-color: white;
-                color: {STYLE_NAVY};
-            }}
-            QComboBox:hover {{ border-color: {STYLE_BLUE}; }}
-            QComboBox QAbstractItemView {{
-                background-color: white;
-                color: {STYLE_NAVY};
-                selection-background-color: {STYLE_BG_LIGHT};
-                selection-color: {STYLE_NAVY};
-            }}
-        """)
-        self.category_cb.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-        form_layout.addWidget(self.category_cb)
+        self.category_cb.addItems(["Housekeeping", "Kitchen", "Front Desk", "Maintenance", "General"])
+        self.category_cb.setVisible(self.is_edit_mode)
+        if self.is_edit_mode:
+            self.category_cb.setMinimumHeight(35)
+            self.category_cb.setStyleSheet(f"""
+                QComboBox {{
+                    border: 2px solid {STYLE_BORDER};
+                    border-radius: 4px;
+                    padding: 5px 10px;
+                    background-color: white;
+                    color: {STYLE_NAVY};
+                }}
+                QComboBox:hover {{ border-color: {STYLE_BLUE}; }}
+                QComboBox QAbstractItemView {{
+                    background-color: white;
+                    color: {STYLE_NAVY};
+                    selection-background-color: {STYLE_BG_LIGHT};
+                    selection-color: {STYLE_NAVY};
+                }}
+            """)
+            self.category_cb.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            # Replace the read-only display with editable combo in edit mode
+            self.category_display.setVisible(False)
+            form_layout.addWidget(self.category_cb)
 
-        # Unit
+        # Unit (read-only in add mode, editable in edit mode)
         unit_label = QLabel("UNIT:")
         unit_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold;")
         form_layout.addWidget(unit_label)
@@ -195,20 +243,32 @@ class AddStockDialog(QDialog):
         self.unit_edit = QLineEdit()
         self.unit_edit.setMinimumHeight(35)
         self.unit_edit.setPlaceholderText("e.g., pcs, boxes, kg")
-        self.unit_edit.setStyleSheet(f"""
-            QLineEdit {{
-                border: 2px solid {STYLE_BORDER};
-                border-radius: 4px;
-                padding: 5px 10px;
-                background-color: white;
-                color: {STYLE_NAVY};
-            }}
-            QLineEdit:focus {{ border-color: {STYLE_BLUE}; }}
-        """)
+        if not self.is_edit_mode:
+            self.unit_edit.setReadOnly(True)
+            self.unit_edit.setStyleSheet(f"""
+                QLineEdit {{
+                    border: 2px solid {STYLE_BORDER};
+                    border-radius: 4px;
+                    padding: 5px 10px;
+                    background-color: #f9fafb;
+                    color: #6b7280;
+                }}
+            """)
+        else:
+            self.unit_edit.setStyleSheet(f"""
+                QLineEdit {{
+                    border: 2px solid {STYLE_BORDER};
+                    border-radius: 4px;
+                    padding: 5px 10px;
+                    background-color: white;
+                    color: {STYLE_NAVY};
+                }}
+                QLineEdit:focus {{ border-color: {STYLE_BLUE}; }}
+            """)
         self.unit_edit.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         form_layout.addWidget(self.unit_edit)
 
-        # Unit Cost
+        # Unit Cost (read-only in add mode)
         unit_cost_label = QLabel("UNIT COST (₱):")
         unit_cost_label.setStyleSheet(f"color: {STYLE_NAVY}; font-weight: bold;")
         form_layout.addWidget(unit_cost_label)
@@ -217,16 +277,28 @@ class AddStockDialog(QDialog):
         self.unit_cost_spin.setRange(0, 999999)
         self.unit_cost_spin.setMinimumHeight(35)
         self.unit_cost_spin.setPrefix("₱ ")
-        self.unit_cost_spin.setStyleSheet(f"""
-            QSpinBox {{
-                border: 2px solid {STYLE_BORDER};
-                border-radius: 4px;
-                padding: 5px 10px;
-                background-color: white;
-                color: {STYLE_NAVY};
-            }}
-            QSpinBox:focus {{ border-color: {STYLE_BLUE}; }}
-        """)
+        if not self.is_edit_mode:
+            self.unit_cost_spin.setReadOnly(True)
+            self.unit_cost_spin.setStyleSheet(f"""
+                QSpinBox {{
+                    border: 2px solid {STYLE_BORDER};
+                    border-radius: 4px;
+                    padding: 5px 10px;
+                    background-color: #f9fafb;
+                    color: #6b7280;
+                }}
+            """)
+        else:
+            self.unit_cost_spin.setStyleSheet(f"""
+                QSpinBox {{
+                    border: 2px solid {STYLE_BORDER};
+                    border-radius: 4px;
+                    padding: 5px 10px;
+                    background-color: white;
+                    color: {STYLE_NAVY};
+                }}
+                QSpinBox:focus {{ border-color: {STYLE_BLUE}; }}
+            """)
         self.unit_cost_spin.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         form_layout.addWidget(self.unit_cost_spin)
 
@@ -321,6 +393,19 @@ class AddStockDialog(QDialog):
         button_layout.addWidget(self.save_btn)
         main_layout.addWidget(button_container)
 
+    def on_item_selected(self, index):
+        """Handle item selection from delivered orders."""
+        if index < 0 or not hasattr(self, 'item_selector'):
+            return
+        
+        # Get the selected item data from the combo box
+        item_data = self.item_selector.itemData(index)
+        if item_data:
+            # Auto-fill the fields with selected item data
+            self.category_display.setText(item_data.get('category', 'General'))
+            self.unit_edit.setText(item_data.get('unit', ''))
+            self.unit_cost_spin.setValue(int(item_data.get('unit_price', 0)))
+
     def populate_fields(self):
         """Populate fields when editing."""
         if self.item_data:
@@ -338,14 +423,30 @@ class AddStockDialog(QDialog):
 
     def get_data(self):
         """Return the form data."""
-        return {
-            'name': self.name_edit.text(),
-            'category': self.category_cb.currentText(),
-            'unit': self.unit_edit.text(),
-            'unit_cost': self.unit_cost_spin.value(),
-            'stock_qty': self.stock_spin.value(),
-            'min_stock': self.min_spin.value()
-        }
+        if self.is_edit_mode:
+            return {
+                'name': self.name_edit.text(),
+                'category': self.category_cb.currentText(),
+                'unit': self.unit_edit.text(),
+                'unit_cost': self.unit_cost_spin.value(),
+                'stock_qty': self.stock_spin.value(),
+                'min_stock': self.min_spin.value()
+            }
+        else:
+            # Add mode: return selected item info
+            selected_index = self.item_selector.currentIndex()
+            item_data = self.item_selector.itemData(selected_index) if selected_index >= 0 else {}
+            
+            return {
+                'purchase_item_id': item_data.get('purchase_item_id') if item_data else None,
+                'item_id': item_data.get('item_id') if item_data else None,
+                'name': self.item_selector.currentText().split(' - ')[0] if self.item_selector.currentText() else '',
+                'category': self.category_display.text(),
+                'unit': self.unit_edit.text(),
+                'unit_cost': self.unit_cost_spin.value(),
+                'stock_qty': self.stock_spin.value(),
+                'min_stock': self.min_spin.value()
+            }
 
 
 class StockRequestsDialog(QDialog):

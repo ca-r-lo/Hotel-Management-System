@@ -322,7 +322,7 @@ class ReportsPage(QWidget):
         actions_layout.setSpacing(12)
         
         self.btn_view_reports = QPushButton("STOCK LEVELS")
-        self.btn_generate_reports = QPushButton("USAGE HISTORY")
+        self.btn_generate_reports = QPushButton("VIEW REPORTS")
         self.btn_summary = QPushButton("LOW STOCK ALERT")
         self.btn_export = QPushButton("EXPORT REPORT")
 

@@ -1,5 +1,5 @@
 """Controller for Department Overview functionality."""
-from models.purchase import DashboardModel
+from models.purchase import DashboardModel, ItemModel
 
 
 class DeptOverviewController:
@@ -14,11 +14,42 @@ class DeptOverviewController:
         self.view = view
         self.dashboard_model = DashboardModel()
         
+        # Populate departments from database
+        self.populate_departments()
+        
         # Connect signals
         self.view.dept_selector.currentTextChanged.connect(self.on_department_changed)
         
         # Initial load
         self.load_department_data("All Departments")
+    
+    def populate_departments(self):
+        """Populate department dropdown with actual departments from database."""
+        try:
+            # Get all unique categories/departments from items table
+            item_model = ItemModel()
+            items = item_model.list_items()
+            
+            # Extract unique categories
+            departments = set()
+            for item in items:
+                category = item.get('category')
+                if category and category not in ['General', 'Uncategorized']:
+                    departments.add(category)
+            
+            # Sort departments alphabetically
+            sorted_departments = sorted(list(departments))
+            
+            # Add to combobox (All Departments is already added in view)
+            for dept in sorted_departments:
+                self.view.dept_selector.addItem(dept)
+                
+        except Exception as e:
+            print(f"Error populating departments: {e}")
+            # Add default departments if database query fails
+            default_depts = ["Housekeeping", "Kitchen", "Front Desk", "Maintenance"]
+            for dept in default_depts:
+                self.view.dept_selector.addItem(dept)
     
     def on_department_changed(self, department_name):
         """Handle department selection change."""

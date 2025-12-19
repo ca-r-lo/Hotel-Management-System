@@ -74,10 +74,10 @@ class AddItemDialog(QDialog):
         self.name_le.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         layout.addWidget(self.name_le)
 
-        # Category
-        layout.addWidget(QLabel("CATEGORY"))
+        # Category/Department
+        layout.addWidget(QLabel("DEPARTMENT"))
         self.category_cb = QComboBox()
-        self.category_cb.addItems(["Room Supplies", "F&B", "Cleaning", "Maintenance", "Others"])
+        self.category_cb.addItems(["Housekeeping", "Kitchen", "Front Desk", "Maintenance"])
         self.category_cb.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         layout.addWidget(self.category_cb)
 
